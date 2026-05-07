@@ -1,50 +1,55 @@
-# Bulk Content Generator + AI Video
+# AI Bulk Video Generator
 
-Generate blog posts, social media captions, product descriptions, and more — then turn them into talking head videos featuring you or your AI influencer. Powered by Claude AI and Kling AI.
+Upload your photos + scripts → Claude + Kling AI generate 5–20 talking head videos in one batch.
 
-## What it does
+## Workflow
 
-| Feature | Description |
-|---|---|
-| Bulk content | Generate dozens of pieces of written content from a topic list |
-| AI Video | Upload your photo → Claude writes a script → Kling AI animates you speaking it |
-| Download | Export all content as ZIP, or download your video |
+1. **Upload images** — 1–20 photos of yourself or your AI influencer
+2. **Add scripts** — paste or upload a `.txt` file, scripts separated by `---`
+3. **Choose settings** — image rotation vs random, 5 or 10 second clips
+4. **Generate** — all videos render on Kling AI simultaneously
+5. **Download** — preview each video or download all as a ZIP
+
+## Write scripts with Claude
+
+Use the **Write Scripts** tab to generate 30-second spoken scripts from topics using Claude AI. One click copies them into the video tab.
 
 ## Setup
 
 ### 1. Install Python 3.8+
-Download from https://python.org if needed.
 
 ### 2. Install dependencies
 ```bash
 pip3 install -r requirements.txt
 ```
 
-### 3. Add your API keys
+### 3. Add API keys
 ```bash
 cp .env.example .env
 ```
-Open `.env` and fill in:
-- `ANTHROPIC_API_KEY` — from https://console.anthropic.com/
-- `KLING_API_KEY` — from https://klingai.com/dev
+Fill in your keys:
+- `ANTHROPIC_API_KEY` — https://console.anthropic.com/
+- `KLING_API_KEY` — https://klingai.com/dev
 
 ### 4. Run
 ```bash
 python3 web_app.py
 ```
+Open **http://localhost:5000**
 
-Open your browser to **http://localhost:5000**
+## Script format
 
-## Content tab
-- Type topics (one per line)
-- Pick content type and tone
-- Click **Generate Content**
-- Copy individual results or download all as ZIP
+Separate multiple scripts with `---` on its own line:
+```
+Hey everyone, today I want to share three tips for better sleep...
 
-## AI Video tab
-1. Upload a clear photo of yourself or your AI influencer
-2. Enter what the video is about and click **Write Script** (Claude generates a 30-second script)
-3. Edit the script if needed
-4. Pick duration (5 or 10 seconds)
-5. Click **Generate Video** — Kling AI will render it in 2–4 minutes
-6. Preview and download the finished video
+---
+
+Okay so continuing from last time, the fourth tip is all about your morning routine...
+
+---
+
+And finally, tip number five...
+```
+
+Each section becomes one video. Scripts can be completely independent topics or a continuing series.

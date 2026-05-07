@@ -1,5 +1,4 @@
 import os
-import time
 import base64
 import requests
 
@@ -9,7 +8,7 @@ KLING_BASE = "https://api.klingai.com"
 def _headers():
     api_key = os.getenv("KLING_API_KEY")
     if not api_key:
-        raise ValueError("KLING_API_KEY not set in .env file")
+        raise ValueError("KLING_API_KEY not set in .env")
     return {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
 
@@ -25,13 +24,8 @@ def start_video(image_path: str, script: str, duration: int = 5) -> str:
         "mode": "std",
         "cfg_scale": 0.5,
     }
-
-    resp = requests.post(
-        f"{KLING_BASE}/v1/videos/image2video",
-        json=payload,
-        headers=_headers(),
-        timeout=30,
-    )
+    resp = requests.post(f"{KLING_BASE}/v1/videos/image2video",
+                         json=payload, headers=_headers(), timeout=30)
     resp.raise_for_status()
     result = resp.json()
     if result.get("code") != 0:
@@ -40,18 +34,13 @@ def start_video(image_path: str, script: str, duration: int = 5) -> str:
 
 
 def check_video(task_id: str) -> dict:
-    resp = requests.get(
-        f"{KLING_BASE}/v1/videos/image2video/{task_id}",
-        headers=_headers(),
-        timeout=30,
-    )
+    resp = requests.get(f"{KLING_BASE}/v1/videos/image2video/{task_id}",
+                        headers=_headers(), timeout=30)
     resp.raise_for_status()
     data = resp.json()["data"]
     status = data["task_status"]
-
     if status == "succeed":
-        url = data["task_result"]["videos"][0]["url"]
-        return {"status": "done", "url": url}
-    elif status == "failed":
-        return {"status": "failed", "error": data.get("task_status_msg", "Unknown error")}
+        return {"status": "done", "url": data["task_result"]["videos"][0]["url"]}
+    if status == "failed":
+        return {"status": "failed", "error": data.get("task_status_msg", "Unknown")}
     return {"status": "processing"}

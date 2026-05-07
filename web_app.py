@@ -1,163 +1,186 @@
 import os
 import uuid
+import random
 import tempfile
 import zipfile
 import threading
+import time
+import requests
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_file
-from generator import generate_content
 from video_generator import start_video, check_video
 
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16 MB upload limit
+app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024
 
-CONTENT_TYPES = [
-    ("blog_post", "Blog Post"),
-    ("social_media", "Social Media Posts"),
-    ("product_description", "Product Description"),
-    ("email", "Email"),
-    ("ad_copy", "Ad Copy"),
-    ("seo_article", "SEO Article"),
-]
-
-TONES = ["professional", "friendly", "excited", "helpful", "urgent", "casual", "formal", "humorous"]
-
-# In-memory store for video tasks
-video_tasks = {}
 UPLOAD_DIR = Path(tempfile.gettempdir()) / "bcg_uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
+
+# In-memory stores (reset on server restart)
+sessions = {}   # session_id -> {images: [path, ...]}
+video_tasks = {}  # task_id -> {status, index, script_preview, url, error}
 
 
 @app.route("/")
 def index():
-    return render_template("index.html", content_types=CONTENT_TYPES, tones=TONES)
+    return render_template("index.html", session_id=str(uuid.uuid4()))
 
 
-# ── Content generation ──────────────────────────────────────────
+# ── Image upload ────────────────────────────────────────────────────────────
 
-@app.route("/generate", methods=["POST"])
-def generate():
+@app.route("/session/images", methods=["POST"])
+def upload_images():
+    session_id = request.form.get("session_id", "")
+    files = request.files.getlist("images")
+    if not files:
+        return jsonify({"error": "No images received."}), 400
+    if len(files) > 20:
+        return jsonify({"error": "Maximum 20 images allowed."}), 400
+
+    session_dir = UPLOAD_DIR / session_id
+    session_dir.mkdir(exist_ok=True)
+
+    saved = []
+    for f in files:
+        ext = Path(f.filename).suffix.lower()
+        if ext not in (".jpg", ".jpeg", ".png", ".webp"):
+            continue
+        fname = f"{uuid.uuid4()}{ext}"
+        fpath = session_dir / fname
+        f.save(fpath)
+        saved.append(str(fpath))
+
+    if not saved:
+        return jsonify({"error": "No valid images. Use JPG, PNG, or WebP."}), 400
+
+    sessions.setdefault(session_id, {})["images"] = saved
+    return jsonify({"count": len(saved)})
+
+
+# ── Batch video generation ───────────────────────────────────────────────────
+
+@app.route("/generate/videos", methods=["POST"])
+def generate_videos():
     data = request.get_json()
-    topics_raw = data.get("topics", "").strip()
-    content_type = data.get("content_type", "blog_post")
-    tone = data.get("tone", "professional")
+    session_id = data.get("session_id", "")
+    scripts = [s.strip() for s in data.get("scripts", []) if s.strip()]
+    image_mode = data.get("image_mode", "rotation")  # "rotation" or "random"
+    duration = int(data.get("duration", 5))
 
-    if not topics_raw:
-        return jsonify({"error": "Please enter at least one topic."}), 400
+    if not scripts:
+        return jsonify({"error": "No scripts provided."}), 400
+    if len(scripts) > 20:
+        return jsonify({"error": "Maximum 20 videos per batch."}), 400
 
-    topics = [t.strip() for t in topics_raw.splitlines() if t.strip()]
-    results = []
-    for topic in topics:
+    images = sessions.get(session_id, {}).get("images", [])
+    if not images:
+        return jsonify({"error": "No images uploaded. Upload your photos first."}), 400
+
+    # Build task list
+    tasks = []
+    for i, script in enumerate(scripts):
+        img = images[i % len(images)] if image_mode == "rotation" else random.choice(images)
+        tid = str(uuid.uuid4())
+        video_tasks[tid] = {
+            "status": "queued",
+            "index": i + 1,
+            "script_preview": script[:80],
+            "url": None,
+            "error": None,
+        }
+        tasks.append({"task_id": tid, "image": img, "script": script, "duration": duration})
+
+    threading.Thread(target=_run_batch, args=(tasks,), daemon=True).start()
+    return jsonify({"tasks": [{"task_id": t["task_id"], "preview": t["script"][:80]} for t in tasks]})
+
+
+def _run_batch(tasks):
+    # Submit all to Kling in parallel (stagger slightly to avoid rate limits)
+    for task in tasks:
+        tid = task["task_id"]
         try:
-            content = generate_content(topic, content_type, tone)
-            results.append({"topic": topic, "content": content, "error": None})
+            kling_id = start_video(task["image"], task["script"], task["duration"])
+            video_tasks[tid]["kling_id"] = kling_id
+            video_tasks[tid]["status"] = "processing"
         except Exception as e:
-            results.append({"topic": topic, "content": None, "error": str(e)})
+            video_tasks[tid]["status"] = "failed"
+            video_tasks[tid]["error"] = str(e)
+        time.sleep(1.5)  # small gap between submissions
 
-    return jsonify({"results": results})
+    # Poll all pending tasks until complete (max 15 minutes)
+    for _ in range(180):
+        time.sleep(5)
+        pending = [t for t in tasks if video_tasks[t["task_id"]]["status"] == "processing"]
+        if not pending:
+            break
+        for task in pending:
+            tid = task["task_id"]
+            kling_id = video_tasks[tid].get("kling_id")
+            if not kling_id:
+                continue
+            try:
+                result = check_video(kling_id)
+                if result["status"] == "done":
+                    video_tasks[tid]["status"] = "done"
+                    video_tasks[tid]["url"] = result["url"]
+                elif result["status"] == "failed":
+                    video_tasks[tid]["status"] = "failed"
+                    video_tasks[tid]["error"] = result.get("error", "Unknown error")
+            except Exception as e:
+                pass  # keep polling
 
 
-@app.route("/download", methods=["POST"])
-def download():
-    data = request.get_json()
-    results = data.get("results", [])
+@app.route("/status/videos", methods=["POST"])
+def videos_status():
+    task_ids = request.get_json().get("task_ids", [])
+    return jsonify({tid: video_tasks.get(tid, {"status": "unknown"}) for tid in task_ids})
+
+
+@app.route("/download/videos", methods=["POST"])
+def download_videos():
+    task_ids = request.get_json().get("task_ids", [])
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
     with zipfile.ZipFile(tmp.name, "w") as zf:
-        for i, item in enumerate(results, start=1):
-            if item.get("content"):
-                safe = item["topic"][:50].replace(" ", "_").replace("/", "-")
-                zf.writestr(f"{i:03d}_{safe}.txt",
-                            f"Topic: {item['topic']}\n{'='*60}\n\n{item['content']}")
+        for tid in task_ids:
+            task = video_tasks.get(tid, {})
+            if task.get("status") == "done" and task.get("url"):
+                try:
+                    resp = requests.get(task["url"], timeout=60)
+                    resp.raise_for_status()
+                    filename = f"video_{task['index']:02d}.mp4"
+                    zf.writestr(filename, resp.content)
+                except Exception:
+                    pass
     return send_file(tmp.name, as_attachment=True,
-                     download_name="generated_content.zip", mimetype="application/zip")
+                     download_name="videos.zip", mimetype="application/zip")
 
 
-# ── Video generation ────────────────────────────────────────────
+# ── Content generator (Claude) ───────────────────────────────────────────────
 
-@app.route("/video/script", methods=["POST"])
-def video_script():
-    """Generate a short spoken script from a topic."""
+@app.route("/generate/scripts", methods=["POST"])
+def generate_scripts():
     data = request.get_json()
-    topic = data.get("topic", "").strip()
+    topics_raw = data.get("topics", "").strip()
     tone = data.get("tone", "friendly")
-    if not topic:
-        return jsonify({"error": "Please enter a topic."}), 400
-    try:
-        # Generate a short 30-second spoken script
-        import anthropic
-        client = anthropic.Anthropic()
+    if not topics_raw:
+        return jsonify({"error": "Enter at least one topic."}), 400
+
+    topics = [t.strip() for t in topics_raw.splitlines() if t.strip()]
+    import anthropic
+    client = anthropic.Anthropic()
+    scripts = []
+    for topic in topics:
         msg = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=300,
             messages=[{"role": "user", "content": (
-                f"Write a short 30-second spoken video script (around 80 words) about: {topic}.\n"
-                f"Tone: {tone}. Write it as natural speech — no stage directions, no headers, "
-                "just the words the person will say directly to camera."
+                f"Write a 30-second spoken video script (around 80 words) about: {topic}.\n"
+                f"Tone: {tone}. Natural speech only — no stage directions, no headers."
             )}],
         )
-        return jsonify({"script": msg.content[0].text})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        scripts.append(msg.content[0].text.strip())
 
-
-@app.route("/video/start", methods=["POST"])
-def video_start():
-    topic = request.form.get("topic", "").strip()
-    script = request.form.get("script", "").strip()
-    duration = int(request.form.get("duration", 5))
-    image_file = request.files.get("image")
-
-    if not script:
-        return jsonify({"error": "Script is required."}), 400
-    if not image_file:
-        return jsonify({"error": "Please upload a photo."}), 400
-
-    ext = Path(image_file.filename).suffix.lower() or ".jpg"
-    if ext not in (".jpg", ".jpeg", ".png", ".webp"):
-        return jsonify({"error": "Photo must be JPG, PNG, or WebP."}), 400
-
-    image_path = UPLOAD_DIR / f"{uuid.uuid4()}{ext}"
-    image_file.save(image_path)
-
-    task_id = str(uuid.uuid4())
-    video_tasks[task_id] = {"status": "starting", "url": None, "error": None}
-
-    def run():
-        try:
-            kling_task_id = start_video(str(image_path), script, duration)
-            video_tasks[task_id]["kling_id"] = kling_task_id
-            video_tasks[task_id]["status"] = "processing"
-            # Poll until done (max 10 minutes)
-            for _ in range(120):
-                import time; time.sleep(5)
-                result = check_video(kling_task_id)
-                if result["status"] == "done":
-                    video_tasks[task_id]["status"] = "done"
-                    video_tasks[task_id]["url"] = result["url"]
-                    return
-                elif result["status"] == "failed":
-                    video_tasks[task_id]["status"] = "failed"
-                    video_tasks[task_id]["error"] = result.get("error", "Failed")
-                    return
-            video_tasks[task_id]["status"] = "failed"
-            video_tasks[task_id]["error"] = "Timed out after 10 minutes."
-        except Exception as e:
-            video_tasks[task_id]["status"] = "failed"
-            video_tasks[task_id]["error"] = str(e)
-        finally:
-            if image_path.exists():
-                image_path.unlink()
-
-    threading.Thread(target=run, daemon=True).start()
-    return jsonify({"task_id": task_id})
-
-
-@app.route("/video/status/<task_id>")
-def video_status(task_id):
-    task = video_tasks.get(task_id)
-    if not task:
-        return jsonify({"error": "Task not found."}), 404
-    return jsonify(task)
+    return jsonify({"scripts": scripts})
 
 
 if __name__ == "__main__":
@@ -165,8 +188,7 @@ if __name__ == "__main__":
     load_dotenv()
     missing = [k for k in ("ANTHROPIC_API_KEY", "KLING_API_KEY") if not os.getenv(k)]
     if missing:
-        print(f"ERROR: Missing in .env: {', '.join(missing)}")
-    else:
-        print("Starting Bulk Content Generator...")
-        print("Open your browser and go to: http://localhost:5000")
-        app.run(debug=False, port=5000)
+        for k in missing:
+            print(f"WARNING: {k} not set in .env")
+    print("Starting... open http://localhost:5000")
+    app.run(debug=False, port=5000)
