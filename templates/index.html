@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bulk Content Generator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f7; color: #1d1d1f; min-height: 100vh; }
+    header { background: #fff; border-bottom: 1px solid #e0e0e0; padding: 18px 32px; display: flex; align-items: center; gap: 12px; }
+    header h1 { font-size: 1.3rem; font-weight: 600; }
+    header span { font-size: 1.5rem; }
+    .container { max-width: 900px; margin: 40px auto; padding: 0 24px; }
+    .card { background: #fff; border-radius: 14px; padding: 28px; margin-bottom: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+    label { display: block; font-weight: 500; font-size: 0.9rem; margin-bottom: 6px; color: #333; }
+    textarea { width: 100%; border: 1px solid #d2d2d7; border-radius: 8px; padding: 12px; font-size: 0.95rem; resize: vertical; min-height: 130px; font-family: inherit; transition: border 0.2s; }
+    textarea:focus { outline: none; border-color: #0071e3; }
+    .row { display: flex; gap: 16px; margin-top: 16px; }
+    .row > div { flex: 1; }
+    select { width: 100%; border: 1px solid #d2d2d7; border-radius: 8px; padding: 10px 12px; font-size: 0.95rem; background: #fff; font-family: inherit; transition: border 0.2s; }
+    select:focus { outline: none; border-color: #0071e3; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; background: #0071e3; color: #fff; border: none; border-radius: 8px; padding: 12px 28px; font-size: 1rem; font-weight: 500; cursor: pointer; margin-top: 20px; transition: background 0.2s; }
+    .btn:hover { background: #0077ed; }
+    .btn:disabled { background: #a0a0a0; cursor: not-allowed; }
+    .btn-outline { background: transparent; color: #0071e3; border: 1.5px solid #0071e3; margin-left: 10px; }
+    .btn-outline:hover { background: #f0f6ff; }
+    #status { margin-top: 16px; font-size: 0.9rem; color: #666; min-height: 20px; }
+    .progress-bar-wrap { background: #e0e0e0; border-radius: 99px; height: 6px; margin-top: 8px; display: none; }
+    .progress-bar { height: 6px; border-radius: 99px; background: #0071e3; transition: width 0.3s; width: 0%; }
+    .results-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .results-header h2 { font-size: 1.1rem; font-weight: 600; }
+    .result-item { border: 1px solid #e0e0e0; border-radius: 10px; margin-bottom: 14px; overflow: hidden; }
+    .result-topic { background: #f5f5f7; padding: 10px 16px; font-weight: 500; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; }
+    .result-topic .badge { font-size: 0.75rem; background: #d1fae5; color: #065f46; border-radius: 99px; padding: 2px 10px; }
+    .result-topic .badge.err { background: #fee2e2; color: #991b1b; }
+    .result-content { padding: 14px 16px; font-size: 0.9rem; white-space: pre-wrap; line-height: 1.6; max-height: 300px; overflow-y: auto; }
+    .copy-btn { font-size: 0.78rem; background: #f0f0f0; border: none; border-radius: 6px; padding: 4px 10px; cursor: pointer; margin-left: 8px; }
+    .copy-btn:hover { background: #e0e0e0; }
+    #results-section { display: none; }
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <header>
+    <span>&#9889;</span>
+    <h1>Bulk Content Generator</h1>
+  </header>
+
+  <div class="container">
+    <div class="card">
+      <label for="topics">Topics <span style="font-weight:400;color:#888">(one per line)</span></label>
+      <textarea id="topics" placeholder="Benefits of green tea&#10;Best noise-cancelling headphones 2025&#10;Summer skincare routine tips"></textarea>
+
+      <div class="row">
+        <div>
+          <label for="content_type">Content Type</label>
+          <select id="content_type">
+            {% for value, label in content_types %}
+            <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="tone">Tone</label>
+          <select id="tone">
+            {% for t in tones %}
+            <option value="{{ t }}">{{ t.capitalize() }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <button class="btn" id="generateBtn" onclick="generate()">
+        <span id="btnText">Generate Content</span>
+        <span id="btnSpinner" style="display:none"><span class="spinner"></span></span>
+      </button>
+
+      <div id="status"></div>
+      <div class="progress-bar-wrap" id="progressWrap">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+    </div>
+
+    <div id="results-section">
+      <div class="card">
+        <div class="results-header">
+          <h2 id="results-title">Results</h2>
+          <button class="btn btn-outline" onclick="downloadAll()">&#8681; Download All as ZIP</button>
+        </div>
+        <div id="results-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let lastResults = [];
+
+    async function generate() {
+      const topics = document.getElementById('topics').value.trim();
+      const content_type = document.getElementById('content_type').value;
+      const tone = document.getElementById('tone').value;
+
+      if (!topics) { setStatus('Please enter at least one topic.', 'red'); return; }
+
+      const lines = topics.split('\n').filter(l => l.trim());
+      setLoading(true);
+      setStatus(`Generating ${lines.length} piece${lines.length > 1 ? 's' : ''} of content...`);
+      showProgress(0);
+      document.getElementById('results-section').style.display = 'none';
+      lastResults = [];
+
+      try {
+        const res = await fetch('/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topics, content_type, tone })
+        });
+        const data = await res.json();
+        if (data.error) { setStatus(data.error, 'red'); setLoading(false); return; }
+
+        lastResults = data.results;
+        renderResults(data.results);
+        const ok = data.results.filter(r => !r.error).length;
+        const fail = data.results.filter(r => r.error).length;
+        setStatus(`Done! ${ok} succeeded${fail ? ', ' + fail + ' failed' : ''}.`, ok > 0 ? 'green' : 'red');
+        showProgress(100);
+      } catch(e) {
+        setStatus('Something went wrong. Is the server running?', 'red');
+      }
+      setLoading(false);
+    }
+
+    function renderResults(results) {
+      const list = document.getElementById('results-list');
+      list.innerHTML = '';
+      results.forEach((r, i) => {
+        const div = document.createElement('div');
+        div.className = 'result-item';
+        div.innerHTML = `
+          <div class="result-topic">
+            <span>${escHtml(r.topic)}</span>
+            <span>
+              <button class="copy-btn" onclick="copyItem(${i})">Copy</button>
+              <span class="badge ${r.error ? 'err' : ''}">${r.error ? 'Failed' : 'Done'}</span>
+            </span>
+          </div>
+          <div class="result-content">${r.error ? '<em style="color:#c00">' + escHtml(r.error) + '</em>' : escHtml(r.content)}</div>
+        `;
+        list.appendChild(div);
+      });
+      document.getElementById('results-title').textContent = `Results (${results.length})`;
+      document.getElementById('results-section').style.display = 'block';
+    }
+
+    async function downloadAll() {
+      const res = await fetch('/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ results: lastResults })
+      });
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'generated_content.zip';
+      a.click(); URL.revokeObjectURL(url);
+    }
+
+    function copyItem(i) {
+      const r = lastResults[i];
+      if (r && r.content) navigator.clipboard.writeText(r.content);
+    }
+
+    function setLoading(on) {
+      document.getElementById('generateBtn').disabled = on;
+      document.getElementById('btnText').textContent = on ? 'Generating...' : 'Generate Content';
+      document.getElementById('btnSpinner').style.display = on ? 'inline' : 'none';
+    }
+
+    function setStatus(msg, color) {
+      const el = document.getElementById('status');
+      el.textContent = msg;
+      el.style.color = color === 'red' ? '#c00' : color === 'green' ? '#065f46' : '#666';
+    }
+
+    function showProgress(pct) {
+      document.getElementById('progressWrap').style.display = 'block';
+      document.getElementById('progressBar').style.width = pct + '%';
+    }
+
+    function escHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+  </script>
+</body>
+</html>
