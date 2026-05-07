@@ -119,7 +119,6 @@ def generate_scripts_and_prompts(description: str, count: int, api_key: str) -> 
     )
     raw = message.content[0].text
     items = _extract_json(raw)
-    # Normalise and trim
     result = []
     for item in items[:count]:
         result.append({
@@ -130,7 +129,7 @@ def generate_scripts_and_prompts(description: str, count: int, api_key: str) -> 
 
 
 # ---------------------------------------------------------------------------
-# Kling AI client
+# Kling AI direct client (JWT auth)
 # ---------------------------------------------------------------------------
 
 class KlingClient:
@@ -195,6 +194,66 @@ class KlingClient:
 
 
 # ---------------------------------------------------------------------------
+# PiAPI Kling client (X-API-KEY auth)
+# ---------------------------------------------------------------------------
+
+class PiAPIKlingClient:
+    """Kling via PiAPI proxy — uses X-API-KEY header, no JWT required."""
+    BASE_URL = "https://api.piapi.ai"
+
+    def __init__(self, api_key: str):
+        self.api_key = api_key.strip()
+
+    def _headers(self) -> dict:
+        return {"X-API-KEY": self.api_key, "Content-Type": "application/json"}
+
+    def submit_image2video(self, image_path: str, prompt: str, duration: str = "5", mode: str = "std") -> str:
+        with open(image_path, "rb") as f:
+            img_b64 = base64.b64encode(f.read()).decode()
+        resp = _requests.post(
+            f"{self.BASE_URL}/api/kling/v1/videos/image2video",
+            headers=self._headers(),
+            json={
+                "model_name": "kling-v1",
+                "image": img_b64,
+                "prompt": prompt,
+                "negative_prompt": "blurry, low quality, distorted, watermark",
+                "cfg_scale": 0.5,
+                "mode": mode,
+                "aspect_ratio": "9:16",
+                "duration": duration,
+            },
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        # PiAPI returns code 200 on success (vs 0 for direct Kling)
+        if data.get("code") != 200:
+            raise RuntimeError(f"PiAPI Kling submit error: {data.get('message')}")
+        return data["data"]["task_id"]
+
+    def poll_result(self, task_id: str, timeout: int = 420) -> str:
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            resp = _requests.get(
+                f"{self.BASE_URL}/api/kling/v1/videos/image2video/{task_id}",
+                headers=self._headers(),
+                timeout=30,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            if data.get("code") != 200:
+                raise RuntimeError(f"PiAPI Kling poll error: {data.get('message')}")
+            status = data["data"]["task_status"]
+            if status == "succeed":
+                return data["data"]["task_result"]["videos"][0]["url"]
+            if status in ("failed", "expired"):
+                raise RuntimeError(f"PiAPI Kling task {status}: {data['data'].get('task_status_msg', '')}")
+            time.sleep(8)
+        raise TimeoutError(f"PiAPI Kling task {task_id} timed out after {timeout}s")
+
+
+# ---------------------------------------------------------------------------
 # Video generator
 # ---------------------------------------------------------------------------
 
@@ -203,12 +262,12 @@ class VideoGenerator:
     TARGET_H = 1920
 
     def __init__(self, image_paths: List[str], image_mode: str = "rotation",
-                 kling_client: Optional[KlingClient] = None, clip_duration: str = "5",
+                 kling_client=None, clip_duration: str = "5",
                  kling_mode: str = "std"):
         self.image_paths = image_paths
         self.image_mode = image_mode
         self._index = 0
-        self.kling = kling_client
+        self.kling = kling_client  # KlingClient or PiAPIKlingClient or None
         self.clip_duration = clip_duration
         self.kling_mode = kling_mode
 

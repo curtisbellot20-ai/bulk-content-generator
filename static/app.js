@@ -4,7 +4,6 @@ let uploadedImages = [];
 let jobId = null;
 let pollTimer = null;
 let aiItems = [];       // [{script, prompt}, ...] from Claude
-let autolaunchTimer = null;
 
 /* ---- Init ---- */
 document.addEventListener('DOMContentLoaded', async () => {
@@ -90,6 +89,13 @@ function setupRadioCards() {
   });
 }
 
+/* ---- Kling provider toggle ---- */
+function toggleKlingProvider() {
+  const isPiAPI = document.querySelector('input[name="kling-provider"]:checked').value === 'piapi';
+  document.getElementById('piapi-key-section').style.display = isPiAPI ? 'block' : 'none';
+  document.getElementById('direct-key-section').style.display = isPiAPI ? 'none' : 'block';
+}
+
 /* ---- Navigation ---- */
 document.getElementById('next-1').addEventListener('click', () => goStep(2));
 
@@ -114,6 +120,7 @@ async function aiGenerate() {
   const btn = document.getElementById('ai-generate-btn');
   const status = document.getElementById('ai-status');
   const preview = document.getElementById('ai-preview');
+  const generateRow = document.getElementById('ai-generate-row');
 
   btn.disabled = true;
   btn.textContent = '⏳ Writing scripts...';
@@ -134,19 +141,19 @@ async function aiGenerate() {
 
     aiItems = data.items;
     status.style.display = 'none';
-    showPreviewAndAutolaunch(aiItems, count);
+    generateRow.style.display = 'none';
+    showPreview(aiItems);
   } catch (err) {
     status.className = 'error';
     status.textContent = `Error: ${err.message}`;
     btn.disabled = false;
-    btn.textContent = '⚡ Generate Scripts & Launch';
+    btn.textContent = '⚡ Generate Scripts';
   }
 }
 
-function showPreviewAndAutolaunch(items, count) {
+function showPreview(items) {
   const preview = document.getElementById('ai-preview');
   const cards = document.getElementById('preview-cards');
-  const cdEl = document.getElementById('countdown');
 
   cards.innerHTML = '';
   items.forEach((item, i) => {
@@ -161,36 +168,24 @@ function showPreviewAndAutolaunch(items, count) {
   });
 
   preview.style.display = 'block';
-
-  let secs = 3;
-  cdEl.textContent = secs;
-  autolaunchTimer = setInterval(() => {
-    secs--;
-    cdEl.textContent = secs;
-    if (secs <= 0) {
-      clearInterval(autolaunchTimer);
-      autolaunchTimer = null;
-      launchWithAiContent(items, count);
-    }
-  }, 1000);
 }
 
 function cancelAutolaunch() {
-  if (autolaunchTimer) { clearInterval(autolaunchTimer); autolaunchTimer = null; }
-  // Copy generated content into manual fields
+  // Copy generated content into manual fields and switch to manual tab
   document.getElementById('scripts-input').value = aiItems.map(i => i.script).join('\n\n---\n\n');
   document.getElementById('prompts-input').value = aiItems.map(i => i.prompt).join('\n');
   switchTab('manual');
   document.getElementById('ai-preview').style.display = 'none';
+  document.getElementById('ai-generate-row').style.display = 'flex';
   document.getElementById('ai-generate-btn').disabled = false;
-  document.getElementById('ai-generate-btn').textContent = '⚡ Generate Scripts & Launch';
+  document.getElementById('ai-generate-btn').textContent = '⚡ Generate Scripts';
 }
 
-async function launchWithAiContent(items, count) {
-  const scriptsText = items.map(i => i.script).join('\n\n---\n\n');
-  const promptsText = items.map(i => i.prompt).join('\n');
-  goStep(4);
-  await submitGeneration(scriptsText, promptsText, count, 'separate');
+function proceedToSettings() {
+  // Copy AI scripts into manual fields so Step 3 → submitManualGeneration works
+  document.getElementById('scripts-input').value = aiItems.map(i => i.script).join('\n\n---\n\n');
+  document.getElementById('prompts-input').value = aiItems.map(i => i.prompt).join('\n');
+  goStep(3);
 }
 
 /* ---- Manual submit (from Step 3) ---- */
@@ -199,7 +194,6 @@ async function submitManualGeneration() {
   if (!scripts) { alert('Please enter at least one script.'); return; }
   const prompts = document.getElementById('prompts-input').value;
   const sm = document.querySelector('input[name="script-mode"]:checked').value;
-  // Estimate count from script blocks
   const count = scripts.split(/\n\s*-{3,}\s*\n/).length;
   goStep(4);
   await submitGeneration(scripts, prompts, count, sm);
@@ -210,8 +204,10 @@ async function submitGeneration(scripts, prompts, videoCount, scriptMode) {
   const im = document.querySelector('input[name="image-mode"]:checked').value;
   const cd = document.querySelector('input[name="clip-duration"]:checked').value;
   const km = document.querySelector('input[name="kling-mode"]:checked').value;
-  const klingAccess = document.getElementById('kling-access').value;
-  const klingSecret = document.getElementById('kling-secret').value;
+  const provider = document.querySelector('input[name="kling-provider"]:checked').value;
+  const piapiKey = provider === 'piapi' ? document.getElementById('piapi-key').value : '';
+  const klingAccess = provider === 'direct' ? document.getElementById('kling-access').value : '';
+  const klingSecret = provider === 'direct' ? document.getElementById('kling-secret').value : '';
 
   resetProgressUI(videoCount);
 
@@ -224,6 +220,7 @@ async function submitGeneration(scripts, prompts, videoCount, scriptMode) {
   form.append('script_mode', scriptMode);
   form.append('clip_duration', cd);
   form.append('kling_mode', km);
+  form.append('piapi_key', piapiKey);
   form.append('kling_access_key', klingAccess);
   form.append('kling_secret_key', klingSecret);
 
@@ -296,7 +293,6 @@ function showGenError(msg) {
 /* ---- Reset ---- */
 function resetWizard() {
   if (pollTimer) clearInterval(pollTimer);
-  if (autolaunchTimer) clearInterval(autolaunchTimer);
   jobId = null; aiItems = [];
   uploadedImages = [];
   document.getElementById('image-grid').innerHTML = '';
@@ -307,8 +303,9 @@ function resetWizard() {
   document.getElementById('ai-count-display').textContent = 5;
   document.getElementById('ai-status').style.display = 'none';
   document.getElementById('ai-preview').style.display = 'none';
+  document.getElementById('ai-generate-row').style.display = 'flex';
   document.getElementById('ai-generate-btn').disabled = false;
-  document.getElementById('ai-generate-btn').textContent = '⚡ Generate Scripts & Launch';
+  document.getElementById('ai-generate-btn').textContent = '⚡ Generate Scripts';
   document.getElementById('scripts-input').value = '';
   document.getElementById('prompts-input').value = '';
   fetch('/api/session', { method: 'POST' }).then(r => r.json()).then(d => { sessionId = d.session_id; });

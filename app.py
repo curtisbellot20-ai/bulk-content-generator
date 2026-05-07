@@ -103,6 +103,7 @@ async def generate_videos(
     script_mode: str = Form(default="separate"),
     clip_duration: str = Form(default="5"),
     kling_mode: str = Form(default="std"),
+    piapi_key: str = Form(default=""),
     kling_access_key: str = Form(default=""),
     kling_secret_key: str = Form(default=""),
 ):
@@ -116,13 +117,16 @@ async def generate_videos(
     if not scripts.strip():
         return JSONResponse({"error": "No scripts provided"}, status_code=400)
 
+    # PiAPI key takes priority over direct Kling keys
+    piapi_key_val = piapi_key.strip() or os.getenv("PIAPI_KEY", "")
     access_key = kling_access_key.strip() or os.getenv("KLING_ACCESS_KEY", "")
     secret_key = kling_secret_key.strip() or os.getenv("KLING_SECRET_KEY", "")
+    using_kling = bool(piapi_key_val or (access_key and secret_key))
 
     job_id = str(uuid.uuid4())
     jobs[job_id] = {
         "status": "queued", "progress": 0, "total": video_count,
-        "videos": [], "error": None, "using_kling": bool(access_key and secret_key),
+        "videos": [], "error": None, "using_kling": using_kling,
     }
     background_tasks.add_task(
         _run_generation,
@@ -130,19 +134,29 @@ async def generate_videos(
         scripts_text=scripts, prompts_text=prompts,
         video_count=video_count, image_mode=image_mode,
         script_mode=script_mode, clip_duration=clip_duration,
-        kling_mode=kling_mode, access_key=access_key, secret_key=secret_key,
+        kling_mode=kling_mode, piapi_key=piapi_key_val,
+        access_key=access_key, secret_key=secret_key,
     )
     return {"job_id": job_id}
 
 
 def _run_generation(job_id, image_paths, scripts_text, prompts_text, video_count,
-                   image_mode, script_mode, clip_duration, kling_mode, access_key, secret_key):
-    from generator import KlingClient, VideoGenerator, parse_prompts, parse_scripts
+                   image_mode, script_mode, clip_duration, kling_mode,
+                   piapi_key, access_key, secret_key):
+    from generator import (
+        KlingClient, PiAPIKlingClient, VideoGenerator, parse_prompts, parse_scripts,
+    )
     output_dir = OUTPUT_DIR / job_id
     output_dir.mkdir(exist_ok=True)
     jobs[job_id]["status"] = "running"
     try:
-        kling = KlingClient(access_key, secret_key) if (access_key and secret_key) else None
+        if piapi_key:
+            kling = PiAPIKlingClient(piapi_key)
+        elif access_key and secret_key:
+            kling = KlingClient(access_key, secret_key)
+        else:
+            kling = None
+
         scripts = parse_scripts(scripts_text, video_count, script_mode)
         prompt_list = parse_prompts(prompts_text, scripts)
         gen = VideoGenerator(image_paths, image_mode=image_mode, kling_client=kling,

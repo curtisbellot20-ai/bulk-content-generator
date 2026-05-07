@@ -78,16 +78,19 @@
         <!-- Generated preview -->
         <div id="ai-preview" style="display:none">
           <div class="preview-header">
-            <span>&#10003; Scripts generated &mdash; launching Kling in <span id="countdown">3</span>s</span>
-            <button class="btn btn-outline btn-sm" onclick="cancelAutolaunch()">&#9998; Edit first</button>
+            <span>&#10003; Scripts ready &mdash; click below to configure settings &amp; launch</span>
           </div>
           <div id="preview-cards"></div>
+          <div class="nav-row" style="margin-top:16px">
+            <button class="btn btn-outline btn-sm" onclick="cancelAutolaunch()">&#9998; Edit scripts first</button>
+            <button class="btn btn-large" onclick="proceedToSettings()">Next: Settings &amp; Launch &rarr;</button>
+          </div>
         </div>
 
-        <div class="nav-row" style="margin-top:24px">
+        <div class="nav-row" style="margin-top:24px" id="ai-generate-row">
           <button class="btn btn-outline" onclick="goStep(1)">&larr; Back</button>
           <button class="btn btn-large" id="ai-generate-btn" onclick="aiGenerate()">
-            &#9889; Generate Scripts &amp; Launch
+            &#9889; Generate Scripts
           </button>
         </div>
       </div>
@@ -162,8 +165,34 @@ Stop trying to go viral. Seriously. Here's what actually grows your account...</
           <span class="kling-logo">&#127916;</span>
           <div><strong>Kling AI</strong><span class="badge badge-purple">Animation Engine</span></div>
         </div>
-        <p class="hint" style="margin-bottom:16px">Keys in <code>.env</code> load automatically. Fields below override per session. No keys = Ken Burns static fallback.</p>
-        <div class="key-row">
+        <p class="hint" style="margin-bottom:16px">Keys in <code>.env</code> load automatically. No keys = Ken Burns static fallback.</p>
+
+        <div class="setting-group" style="margin-bottom:0">
+          <label>API Provider</label>
+          <div class="radio-group">
+            <label class="radio-card active" id="rc-piapi">
+              <input type="radio" name="kling-provider" value="piapi" checked onchange="toggleKlingProvider()" />
+              <span class="rc-icon">&#9889;</span><span class="rc-title">PiAPI</span>
+              <span class="rc-desc">Single key &mdash; recommended</span>
+            </label>
+            <label class="radio-card" id="rc-direct">
+              <input type="radio" name="kling-provider" value="direct" onchange="toggleKlingProvider()" />
+              <span class="rc-icon">&#128273;</span><span class="rc-title">Direct Kling</span>
+              <span class="rc-desc">Access + Secret key pair</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- PiAPI key field -->
+        <div id="piapi-key-section" class="key-row" style="margin-top:16px">
+          <div class="field-group" style="flex:1">
+            <label class="field-label">PiAPI Key <span class="badge">from piapi.ai</span></label>
+            <input type="password" id="piapi-key" placeholder="From .env or enter here" autocomplete="off" />
+          </div>
+        </div>
+
+        <!-- Direct Kling key fields -->
+        <div id="direct-key-section" class="key-row" style="margin-top:16px;display:none">
           <div class="field-group">
             <label class="field-label">Access Key</label>
             <input type="password" id="kling-access" placeholder="From .env or enter here" autocomplete="off" />
@@ -173,6 +202,7 @@ Stop trying to go viral. Seriously. Here's what actually grows your account...</
             <input type="password" id="kling-secret" placeholder="From .env or enter here" autocomplete="off" />
           </div>
         </div>
+
         <div class="setting-group" style="margin-top:20px;margin-bottom:0">
           <label>Clip Duration</label>
           <div class="radio-group">
@@ -230,7 +260,7 @@ Stop trying to go viral. Seriously. Here's what actually grows your account...</
 
       <div id="gen-error" style="display:none">
         <div class="error-banner" id="error-msg"></div>
-        <button class="btn btn-outline" onclick="goStep(2)">&#8592; Back</button>
+        <button class="btn btn-outline" onclick="goStep(3)">&#8592; Back to Settings</button>
       </div>
     </div>
   </div>
