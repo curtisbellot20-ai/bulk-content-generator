@@ -1,5 +1,4 @@
 import os
-import re
 import uuid
 import zipfile
 from pathlib import Path
@@ -11,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
 
-load_dotenv()  # reads KLING_ACCESS_KEY / KLING_SECRET_KEY from .env if present
+load_dotenv()
 
 app = FastAPI(title="Bulk Content Generator")
 
@@ -63,6 +62,36 @@ async def delete_image(session_id: str, filename: str):
     return {"ok": True}
 
 
+# ---------------------------------------------------------------------------
+# AI script generation
+# ---------------------------------------------------------------------------
+
+@app.post("/api/generate-scripts")
+async def generate_scripts(
+    description: str = Form(...),
+    count: int = Form(default=5),
+    anthropic_key: str = Form(default=""),
+):
+    """Generate scripts + Kling motion prompts via Claude and return them."""
+    api_key = anthropic_key.strip() or os.getenv("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return JSONResponse(
+            {"error": "Anthropic API key required. Add to .env or enter in the UI."},
+            status_code=400,
+        )
+    count = max(1, min(20, count))
+    try:
+        from generator import generate_scripts_and_prompts
+        items = generate_scripts_and_prompts(description, count, api_key)
+        return {"items": items}
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+# ---------------------------------------------------------------------------
+# Video generation
+# ---------------------------------------------------------------------------
+
 @app.post("/api/generate")
 async def generate_videos(
     background_tasks: BackgroundTasks,
@@ -74,86 +103,57 @@ async def generate_videos(
     script_mode: str = Form(default="separate"),
     clip_duration: str = Form(default="5"),
     kling_mode: str = Form(default="std"),
-    # Optional UI overrides for Kling credentials
     kling_access_key: str = Form(default=""),
     kling_secret_key: str = Form(default=""),
 ):
     video_count = max(1, min(20, video_count))
-
     session_dir = UPLOAD_DIR / session_id
     if not session_dir.exists():
         return JSONResponse({"error": "Invalid session"}, status_code=400)
-
-    image_paths = sorted(
-        str(p) for p in session_dir.iterdir() if p.suffix.lower() in ALLOWED_EXTS
-    )
+    image_paths = sorted(str(p) for p in session_dir.iterdir() if p.suffix.lower() in ALLOWED_EXTS)
     if not image_paths:
         return JSONResponse({"error": "No images uploaded"}, status_code=400)
     if not scripts.strip():
         return JSONResponse({"error": "No scripts provided"}, status_code=400)
 
-    # Resolve Kling credentials: UI fields take priority over .env
     access_key = kling_access_key.strip() or os.getenv("KLING_ACCESS_KEY", "")
     secret_key = kling_secret_key.strip() or os.getenv("KLING_SECRET_KEY", "")
 
     job_id = str(uuid.uuid4())
     jobs[job_id] = {
-        "status": "queued",
-        "progress": 0,
-        "total": video_count,
-        "videos": [],
-        "error": None,
-        "using_kling": bool(access_key and secret_key),
+        "status": "queued", "progress": 0, "total": video_count,
+        "videos": [], "error": None, "using_kling": bool(access_key and secret_key),
     }
-
     background_tasks.add_task(
         _run_generation,
-        job_id=job_id,
-        image_paths=image_paths,
-        scripts_text=scripts,
-        prompts_text=prompts,
-        video_count=video_count,
-        image_mode=image_mode,
-        script_mode=script_mode,
-        clip_duration=clip_duration,
-        kling_mode=kling_mode,
-        access_key=access_key,
-        secret_key=secret_key,
+        job_id=job_id, image_paths=image_paths,
+        scripts_text=scripts, prompts_text=prompts,
+        video_count=video_count, image_mode=image_mode,
+        script_mode=script_mode, clip_duration=clip_duration,
+        kling_mode=kling_mode, access_key=access_key, secret_key=secret_key,
     )
     return {"job_id": job_id}
 
 
-def _run_generation(
-    job_id, image_paths, scripts_text, prompts_text, video_count,
-    image_mode, script_mode, clip_duration, kling_mode, access_key, secret_key,
-):
+def _run_generation(job_id, image_paths, scripts_text, prompts_text, video_count,
+                   image_mode, script_mode, clip_duration, kling_mode, access_key, secret_key):
     from generator import KlingClient, VideoGenerator, parse_prompts, parse_scripts
-
     output_dir = OUTPUT_DIR / job_id
     output_dir.mkdir(exist_ok=True)
     jobs[job_id]["status"] = "running"
-
     try:
         kling = KlingClient(access_key, secret_key) if (access_key and secret_key) else None
         scripts = parse_scripts(scripts_text, video_count, script_mode)
         prompt_list = parse_prompts(prompts_text, scripts)
-
-        gen = VideoGenerator(
-            image_paths,
-            image_mode=image_mode,
-            kling_client=kling,
-            clip_duration=clip_duration,
-            kling_mode=kling_mode,
-        )
-
+        gen = VideoGenerator(image_paths, image_mode=image_mode, kling_client=kling,
+                             clip_duration=clip_duration, kling_mode=kling_mode)
         done = []
         for i, (script, prompt) in enumerate(zip(scripts[:video_count], prompt_list)):
             jobs[job_id]["progress"] = i
-            out = str(output_dir / f"video_{i + 1:02d}.mp4")
+            out = str(output_dir / f"video_{i+1:02d}.mp4")
             gen.create_video(script, prompt, out, video_index=i)
-            done.append(f"video_{i + 1:02d}.mp4")
+            done.append(f"video_{i+1:02d}.mp4")
             jobs[job_id]["videos"] = done.copy()
-
         jobs[job_id]["status"] = "complete"
         jobs[job_id]["progress"] = video_count
     except Exception as exc:
