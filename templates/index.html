@@ -6,52 +6,84 @@
   <title>Bulk Content Generator</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f7; color: #1d1d1f; min-height: 100vh; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f7; color: #1d1d1f; }
     header { background: #fff; border-bottom: 1px solid #e0e0e0; padding: 18px 32px; display: flex; align-items: center; gap: 12px; }
     header h1 { font-size: 1.3rem; font-weight: 600; }
-    header span { font-size: 1.5rem; }
-    .container { max-width: 900px; margin: 40px auto; padding: 0 24px; }
-    .card { background: #fff; border-radius: 14px; padding: 28px; margin-bottom: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+    .tabs { display: flex; gap: 4px; padding: 24px 24px 0; max-width: 960px; margin: 0 auto; }
+    .tab-btn { padding: 10px 24px; border: none; border-radius: 10px 10px 0 0; font-size: 0.95rem; font-weight: 500; cursor: pointer; background: #e0e0e5; color: #555; transition: all 0.15s; }
+    .tab-btn.active { background: #fff; color: #0071e3; box-shadow: 0 -1px 4px rgba(0,0,0,0.06); }
+    .container { max-width: 960px; margin: 0 auto; padding: 0 24px 40px; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .card { background: #fff; border-radius: 0 14px 14px 14px; padding: 28px; margin-bottom: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+    .card + .card { border-radius: 14px; }
     label { display: block; font-weight: 500; font-size: 0.9rem; margin-bottom: 6px; color: #333; }
-    textarea { width: 100%; border: 1px solid #d2d2d7; border-radius: 8px; padding: 12px; font-size: 0.95rem; resize: vertical; min-height: 130px; font-family: inherit; transition: border 0.2s; }
-    textarea:focus { outline: none; border-color: #0071e3; }
+    textarea { width: 100%; border: 1px solid #d2d2d7; border-radius: 8px; padding: 12px; font-size: 0.95rem; resize: vertical; min-height: 120px; font-family: inherit; transition: border 0.2s; }
+    textarea:focus, input:focus, select:focus { outline: none; border-color: #0071e3; }
+    input[type=text] { width: 100%; border: 1px solid #d2d2d7; border-radius: 8px; padding: 10px 12px; font-size: 0.95rem; font-family: inherit; }
     .row { display: flex; gap: 16px; margin-top: 16px; }
     .row > div { flex: 1; }
-    select { width: 100%; border: 1px solid #d2d2d7; border-radius: 8px; padding: 10px 12px; font-size: 0.95rem; background: #fff; font-family: inherit; transition: border 0.2s; }
-    select:focus { outline: none; border-color: #0071e3; }
+    select { width: 100%; border: 1px solid #d2d2d7; border-radius: 8px; padding: 10px 12px; font-size: 0.95rem; background: #fff; font-family: inherit; }
     .btn { display: inline-flex; align-items: center; gap: 8px; background: #0071e3; color: #fff; border: none; border-radius: 8px; padding: 12px 28px; font-size: 1rem; font-weight: 500; cursor: pointer; margin-top: 20px; transition: background 0.2s; }
-    .btn:hover { background: #0077ed; }
+    .btn:hover:not(:disabled) { background: #0077ed; }
     .btn:disabled { background: #a0a0a0; cursor: not-allowed; }
-    .btn-outline { background: transparent; color: #0071e3; border: 1.5px solid #0071e3; margin-left: 10px; }
-    .btn-outline:hover { background: #f0f6ff; }
-    #status { margin-top: 16px; font-size: 0.9rem; color: #666; min-height: 20px; }
-    .progress-bar-wrap { background: #e0e0e0; border-radius: 99px; height: 6px; margin-top: 8px; display: none; }
-    .progress-bar { height: 6px; border-radius: 99px; background: #0071e3; transition: width 0.3s; width: 0%; }
+    .btn-sm { padding: 8px 18px; font-size: 0.88rem; margin-top: 0; }
+    .btn-outline { background: transparent; color: #0071e3; border: 1.5px solid #0071e3; }
+    .btn-outline:hover:not(:disabled) { background: #f0f6ff; }
+    .btn-green { background: #059669; }
+    .btn-green:hover:not(:disabled) { background: #047857; }
+    #status, #vstatus { margin-top: 14px; font-size: 0.9rem; color: #666; min-height: 20px; }
+    .progress-wrap { background: #e0e0e0; border-radius: 99px; height: 6px; margin-top: 8px; display: none; }
+    .progress-bar { height: 6px; border-radius: 99px; background: #0071e3; transition: width 0.4s; width: 0%; }
     .results-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
     .results-header h2 { font-size: 1.1rem; font-weight: 600; }
-    .result-item { border: 1px solid #e0e0e0; border-radius: 10px; margin-bottom: 14px; overflow: hidden; }
+    .result-item { border: 1px solid #e0e0e0; border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
     .result-topic { background: #f5f5f7; padding: 10px 16px; font-weight: 500; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; }
-    .result-topic .badge { font-size: 0.75rem; background: #d1fae5; color: #065f46; border-radius: 99px; padding: 2px 10px; }
-    .result-topic .badge.err { background: #fee2e2; color: #991b1b; }
-    .result-content { padding: 14px 16px; font-size: 0.9rem; white-space: pre-wrap; line-height: 1.6; max-height: 300px; overflow-y: auto; }
+    .badge { font-size: 0.75rem; border-radius: 99px; padding: 2px 10px; }
+    .badge-ok { background: #d1fae5; color: #065f46; }
+    .badge-err { background: #fee2e2; color: #991b1b; }
+    .result-content { padding: 14px 16px; font-size: 0.9rem; white-space: pre-wrap; line-height: 1.6; max-height: 280px; overflow-y: auto; }
     .copy-btn { font-size: 0.78rem; background: #f0f0f0; border: none; border-radius: 6px; padding: 4px 10px; cursor: pointer; margin-left: 8px; }
     .copy-btn:hover { background: #e0e0e0; }
-    #results-section { display: none; }
-    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 0.7s linear infinite; }
+    #content-results { display: none; }
+
+    /* Video tab */
+    .upload-zone { border: 2px dashed #d2d2d7; border-radius: 12px; padding: 32px; text-align: center; cursor: pointer; transition: border 0.2s; position: relative; }
+    .upload-zone:hover, .upload-zone.drag { border-color: #0071e3; background: #f0f6ff; }
+    .upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .upload-zone .preview { max-width: 160px; max-height: 160px; border-radius: 10px; margin: 0 auto 12px; display: block; object-fit: cover; }
+    .upload-hint { color: #888; font-size: 0.9rem; margin-top: 6px; }
+    .script-actions { display: flex; gap: 10px; align-items: flex-start; margin-top: 8px; }
+    .script-actions textarea { margin: 0; }
+    #video-result { display: none; margin-top: 20px; }
+    #video-result video { width: 100%; border-radius: 10px; margin-bottom: 12px; }
+    .spinner { display: inline-block; width: 15px; height: 15px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .step-label { display: inline-block; background: #0071e3; color: #fff; border-radius: 50%; width: 22px; height: 22px; line-height: 22px; text-align: center; font-size: 0.75rem; font-weight: 700; margin-right: 8px; }
+    .section-title { font-size: 1rem; font-weight: 600; margin-bottom: 14px; }
   </style>
 </head>
 <body>
-  <header>
-    <span>&#9889;</span>
-    <h1>Bulk Content Generator</h1>
-  </header>
 
-  <div class="container">
+<header>
+  <span style="font-size:1.4rem">&#9889;</span>
+  <h1>Bulk Content Generator</h1>
+</header>
+
+<div style="max-width:960px;margin:0 auto;padding:0 24px">
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('content', this)">&#128221; Content</button>
+    <button class="tab-btn" onclick="switchTab('video', this)">&#127916; AI Video</button>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- ── CONTENT TAB ── -->
+  <div id="tab-content" class="tab-panel active">
     <div class="card">
       <label for="topics">Topics <span style="font-weight:400;color:#888">(one per line)</span></label>
       <textarea id="topics" placeholder="Benefits of green tea&#10;Best noise-cancelling headphones 2025&#10;Summer skincare routine tips"></textarea>
-
       <div class="row">
         <div>
           <label for="content_type">Content Type</label>
@@ -70,127 +102,274 @@
           </select>
         </div>
       </div>
-
-      <button class="btn" id="generateBtn" onclick="generate()">
+      <button class="btn" id="generateBtn" onclick="generateContent()">
         <span id="btnText">Generate Content</span>
         <span id="btnSpinner" style="display:none"><span class="spinner"></span></span>
       </button>
-
       <div id="status"></div>
-      <div class="progress-bar-wrap" id="progressWrap">
-        <div class="progress-bar" id="progressBar"></div>
-      </div>
+      <div class="progress-wrap" id="progressWrap"><div class="progress-bar" id="progressBar"></div></div>
     </div>
 
-    <div id="results-section">
+    <div id="content-results">
       <div class="card">
         <div class="results-header">
           <h2 id="results-title">Results</h2>
-          <button class="btn btn-outline" onclick="downloadAll()">&#8681; Download All as ZIP</button>
+          <button class="btn btn-outline btn-sm" onclick="downloadAll()">&#8681; Download All as ZIP</button>
         </div>
         <div id="results-list"></div>
       </div>
     </div>
   </div>
 
-  <script>
-    let lastResults = [];
+  <!-- ── VIDEO TAB ── -->
+  <div id="tab-video" class="tab-panel">
+    <div class="card">
+      <p class="section-title">&#127916; Generate a talking head video of you or your AI influencer</p>
 
-    async function generate() {
-      const topics = document.getElementById('topics').value.trim();
-      const content_type = document.getElementById('content_type').value;
-      const tone = document.getElementById('tone').value;
+      <!-- Step 1: Photo -->
+      <label><span class="step-label">1</span> Upload your photo or AI influencer image</label>
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="photoInput" accept="image/jpeg,image/png,image/webp" onchange="previewPhoto(this)" />
+        <img id="photoPreview" class="preview" style="display:none" />
+        <div id="uploadPlaceholder">
+          <div style="font-size:2.5rem">&#128247;</div>
+          <div style="font-weight:500;margin-top:8px">Click to choose a photo</div>
+          <div class="upload-hint">JPG, PNG or WebP &mdash; clear face photo works best</div>
+        </div>
+      </div>
 
-      if (!topics) { setStatus('Please enter at least one topic.', 'red'); return; }
+      <!-- Step 2: Topic -->
+      <div style="margin-top:20px">
+        <label><span class="step-label">2</span> What is the video about?</label>
+        <div style="display:flex;gap:10px;align-items:center">
+          <input type="text" id="videoTopic" placeholder="e.g. 3 tips for better sleep" style="flex:1" />
+          <select id="videoTone" style="width:160px">
+            {% for t in tones %}
+            <option value="{{ t }}">{{ t.capitalize() }}</option>
+            {% endfor %}
+          </select>
+          <button class="btn btn-sm" style="margin-top:0;white-space:nowrap" onclick="generateScript()" id="scriptBtn">Write Script</button>
+        </div>
+      </div>
 
-      const lines = topics.split('\n').filter(l => l.trim());
-      setLoading(true);
-      setStatus(`Generating ${lines.length} piece${lines.length > 1 ? 's' : ''} of content...`);
-      showProgress(0);
-      document.getElementById('results-section').style.display = 'none';
-      lastResults = [];
+      <!-- Step 3: Script -->
+      <div style="margin-top:20px">
+        <label><span class="step-label">3</span> Script <span style="font-weight:400;color:#888">(edit freely)</span></label>
+        <textarea id="videoScript" placeholder="Your script will appear here after clicking Write Script &mdash; or type it yourself..." style="min-height:110px"></textarea>
+      </div>
 
-      try {
-        const res = await fetch('/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ topics, content_type, tone })
-        });
-        const data = await res.json();
-        if (data.error) { setStatus(data.error, 'red'); setLoading(false); return; }
+      <!-- Step 4: Duration -->
+      <div style="margin-top:16px">
+        <label><span class="step-label">4</span> Video duration</label>
+        <select id="videoDuration" style="max-width:200px">
+          <option value="5">5 seconds</option>
+          <option value="10">10 seconds</option>
+        </select>
+      </div>
 
-        lastResults = data.results;
-        renderResults(data.results);
-        const ok = data.results.filter(r => !r.error).length;
-        const fail = data.results.filter(r => r.error).length;
-        setStatus(`Done! ${ok} succeeded${fail ? ', ' + fail + ' failed' : ''}.`, ok > 0 ? 'green' : 'red');
-        showProgress(100);
-      } catch(e) {
-        setStatus('Something went wrong. Is the server running?', 'red');
+      <button class="btn btn-green" id="videoBtn" onclick="generateVideo()" style="margin-top:20px">
+        <span id="videoBtnText">Generate Video</span>
+        <span id="videoBtnSpinner" style="display:none"><span class="spinner"></span></span>
+      </button>
+
+      <div id="vstatus"></div>
+      <div class="progress-wrap" id="vprogressWrap"><div class="progress-bar" id="vprogressBar"></div></div>
+
+      <div id="video-result">
+        <video id="resultVideo" controls></video>
+        <div>
+          <a id="videoDownloadBtn" class="btn btn-outline btn-sm" href="#" download="video.mp4">&#8681; Download Video</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let lastResults = [];
+let pollTimer = null;
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── Content generation ──
+async function generateContent() {
+  const topics = document.getElementById('topics').value.trim();
+  const content_type = document.getElementById('content_type').value;
+  const tone = document.getElementById('tone').value;
+  if (!topics) { setStatus('Please enter at least one topic.', 'red'); return; }
+  const lines = topics.split('\n').filter(l => l.trim());
+  setBtnLoading('generateBtn', 'btnText', 'btnSpinner', true, 'Generating...');
+  setStatus(`Generating ${lines.length} piece${lines.length > 1 ? 's' : ''} of content...`);
+  setProgress('progressWrap', 'progressBar', 10);
+  document.getElementById('content-results').style.display = 'none';
+  lastResults = [];
+  try {
+    const res = await fetch('/generate', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({topics, content_type, tone}) });
+    const data = await res.json();
+    if (data.error) { setStatus(data.error, 'red'); return; }
+    lastResults = data.results;
+    renderResults(data.results);
+    const ok = data.results.filter(r => !r.error).length;
+    const fail = data.results.filter(r => r.error).length;
+    setStatus(`Done! ${ok} succeeded${fail ? ', ' + fail + ' failed' : ''}.`, ok > 0 ? 'green' : 'red');
+    setProgress('progressWrap', 'progressBar', 100);
+  } catch(e) { setStatus('Something went wrong. Is the server running?', 'red'); }
+  setBtnLoading('generateBtn', 'btnText', 'btnSpinner', false, 'Generate Content');
+}
+
+function renderResults(results) {
+  const list = document.getElementById('results-list');
+  list.innerHTML = '';
+  results.forEach((r, i) => {
+    const div = document.createElement('div');
+    div.className = 'result-item';
+    div.innerHTML = `
+      <div class="result-topic">
+        <span>${escHtml(r.topic)}</span>
+        <span><button class="copy-btn" onclick="copyItem(${i})">Copy</button>
+        <span class="badge ${r.error ? 'badge-err' : 'badge-ok'}">${r.error ? 'Failed' : 'Done'}</span></span>
+      </div>
+      <div class="result-content">${r.error ? '<em style="color:#c00">' + escHtml(r.error) + '</em>' : escHtml(r.content)}</div>`;
+    list.appendChild(div);
+  });
+  document.getElementById('results-title').textContent = `Results (${results.length})`;
+  document.getElementById('content-results').style.display = 'block';
+}
+
+async function downloadAll() {
+  const res = await fetch('/download', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({results: lastResults}) });
+  const blob = await res.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'generated_content.zip'; a.click();
+}
+
+function copyItem(i) {
+  const r = lastResults[i];
+  if (r && r.content) navigator.clipboard.writeText(r.content);
+}
+
+// ── Video generation ──
+function previewPhoto(input) {
+  if (!input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = document.getElementById('photoPreview');
+    img.src = e.target.result;
+    img.style.display = 'block';
+    document.getElementById('uploadPlaceholder').style.display = 'none';
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+async function generateScript() {
+  const topic = document.getElementById('videoTopic').value.trim();
+  const tone = document.getElementById('videoTone').value;
+  if (!topic) { setVStatus('Please enter a topic first.', 'red'); return; }
+  setBtnLoading('scriptBtn', null, null, true, 'Writing...');
+  try {
+    const res = await fetch('/video/script', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({topic, tone}) });
+    const data = await res.json();
+    if (data.error) { setVStatus(data.error, 'red'); return; }
+    document.getElementById('videoScript').value = data.script;
+    setVStatus('Script ready — edit it if you like, then click Generate Video.', 'green');
+  } catch(e) { setVStatus('Failed to generate script.', 'red'); }
+  setBtnLoading('scriptBtn', null, null, false, 'Write Script');
+}
+
+async function generateVideo() {
+  const photo = document.getElementById('photoInput').files[0];
+  const script = document.getElementById('videoScript').value.trim();
+  const topic = document.getElementById('videoTopic').value.trim();
+  const duration = document.getElementById('videoDuration').value;
+
+  if (!photo) { setVStatus('Please upload a photo first.', 'red'); return; }
+  if (!script) { setVStatus('Please write or generate a script first.', 'red'); return; }
+
+  setBtnLoading('videoBtn', 'videoBtnText', 'videoBtnSpinner', true, 'Sending to Kling AI...');
+  setVStatus('Uploading photo and starting video generation...');
+  setProgress('vprogressWrap', 'vprogressBar', 5);
+  document.getElementById('video-result').style.display = 'none';
+
+  const form = new FormData();
+  form.append('image', photo);
+  form.append('script', script);
+  form.append('topic', topic);
+  form.append('duration', duration);
+
+  try {
+    const res = await fetch('/video/start', { method: 'POST', body: form });
+    const data = await res.json();
+    if (data.error) { setVStatus(data.error, 'red'); setBtnLoading('videoBtn', 'videoBtnText', 'videoBtnSpinner', false, 'Generate Video'); return; }
+    pollVideo(data.task_id);
+  } catch(e) {
+    setVStatus('Failed to start video generation.', 'red');
+    setBtnLoading('videoBtn', 'videoBtnText', 'videoBtnSpinner', false, 'Generate Video');
+  }
+}
+
+function pollVideo(taskId) {
+  let dots = 0;
+  let pct = 10;
+  setVStatus('Kling AI is generating your video — this takes 2–4 minutes...');
+
+  pollTimer = setInterval(async () => {
+    dots = (dots + 1) % 4;
+    pct = Math.min(pct + 2, 90);
+    setProgress('vprogressWrap', 'vprogressBar', pct);
+    setVStatus('Kling AI is generating your video' + '.'.repeat(dots + 1) + ' (this takes 2–4 minutes)');
+
+    try {
+      const res = await fetch(`/video/status/${taskId}`);
+      const data = await res.json();
+
+      if (data.status === 'done') {
+        clearInterval(pollTimer);
+        setProgress('vprogressWrap', 'vprogressBar', 100);
+        setVStatus('Video ready!', 'green');
+        document.getElementById('resultVideo').src = data.url;
+        document.getElementById('videoDownloadBtn').href = data.url;
+        document.getElementById('video-result').style.display = 'block';
+        setBtnLoading('videoBtn', 'videoBtnText', 'videoBtnSpinner', false, 'Generate Video');
+      } else if (data.status === 'failed') {
+        clearInterval(pollTimer);
+        setVStatus('Video generation failed: ' + (data.error || 'Unknown error'), 'red');
+        setBtnLoading('videoBtn', 'videoBtnText', 'videoBtnSpinner', false, 'Generate Video');
       }
-      setLoading(false);
-    }
+    } catch(e) { /* keep polling */ }
+  }, 5000);
+}
 
-    function renderResults(results) {
-      const list = document.getElementById('results-list');
-      list.innerHTML = '';
-      results.forEach((r, i) => {
-        const div = document.createElement('div');
-        div.className = 'result-item';
-        div.innerHTML = `
-          <div class="result-topic">
-            <span>${escHtml(r.topic)}</span>
-            <span>
-              <button class="copy-btn" onclick="copyItem(${i})">Copy</button>
-              <span class="badge ${r.error ? 'err' : ''}">${r.error ? 'Failed' : 'Done'}</span>
-            </span>
-          </div>
-          <div class="result-content">${r.error ? '<em style="color:#c00">' + escHtml(r.error) + '</em>' : escHtml(r.content)}</div>
-        `;
-        list.appendChild(div);
-      });
-      document.getElementById('results-title').textContent = `Results (${results.length})`;
-      document.getElementById('results-section').style.display = 'block';
-    }
-
-    async function downloadAll() {
-      const res = await fetch('/download', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ results: lastResults })
-      });
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'generated_content.zip';
-      a.click(); URL.revokeObjectURL(url);
-    }
-
-    function copyItem(i) {
-      const r = lastResults[i];
-      if (r && r.content) navigator.clipboard.writeText(r.content);
-    }
-
-    function setLoading(on) {
-      document.getElementById('generateBtn').disabled = on;
-      document.getElementById('btnText').textContent = on ? 'Generating...' : 'Generate Content';
-      document.getElementById('btnSpinner').style.display = on ? 'inline' : 'none';
-    }
-
-    function setStatus(msg, color) {
-      const el = document.getElementById('status');
-      el.textContent = msg;
-      el.style.color = color === 'red' ? '#c00' : color === 'green' ? '#065f46' : '#666';
-    }
-
-    function showProgress(pct) {
-      document.getElementById('progressWrap').style.display = 'block';
-      document.getElementById('progressBar').style.width = pct + '%';
-    }
-
-    function escHtml(s) {
-      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    }
-  </script>
+// ── Helpers ──
+function setBtnLoading(btnId, textId, spinnerId, loading, label) {
+  const btn = document.getElementById(btnId);
+  if (btn) btn.disabled = loading;
+  if (textId) document.getElementById(textId).textContent = label;
+  if (spinnerId) document.getElementById(spinnerId).style.display = loading ? 'inline' : 'none';
+  if (!textId && btn) btn.textContent = label;
+}
+function setStatus(msg, color) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.style.color = color === 'red' ? '#c00' : color === 'green' ? '#065f46' : '#666';
+}
+function setVStatus(msg, color) {
+  const el = document.getElementById('vstatus');
+  el.textContent = msg;
+  el.style.color = color === 'red' ? '#c00' : color === 'green' ? '#065f46' : '#666';
+}
+function setProgress(wrapId, barId, pct) {
+  document.getElementById(wrapId).style.display = 'block';
+  document.getElementById(barId).style.width = pct + '%';
+}
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
 </body>
 </html>

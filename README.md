@@ -1,64 +1,50 @@
-# Bulk Content Generator
+# Bulk Content Generator + AI Video
 
-Generate dozens of blog posts, social media captions, product descriptions, emails, and ads in one command — powered by Claude AI.
+Generate blog posts, social media captions, product descriptions, and more — then turn them into talking head videos featuring you or your AI influencer. Powered by Claude AI and Kling AI.
 
-## Supported content types
+## What it does
 
-| Type | Description |
+| Feature | Description |
 |---|---|
-| `blog_post` | 500–700 word structured article |
-| `social_media` | LinkedIn + Twitter/X + Instagram posts |
-| `product_description` | 150–250 word sales copy |
-| `email` | Professional email with subject line |
-| `ad_copy` | Headline + body + CTA |
-| `seo_article` | 800–1000 word keyword-optimised article |
+| Bulk content | Generate dozens of pieces of written content from a topic list |
+| AI Video | Upload your photo → Claude writes a script → Kling AI animates you speaking it |
+| Download | Export all content as ZIP, or download your video |
 
 ## Setup
 
 ### 1. Install Python 3.8+
-Download from https://python.org if you don't have it.
+Download from https://python.org if needed.
 
 ### 2. Install dependencies
 ```bash
 pip3 install -r requirements.txt
 ```
 
-### 3. Add your API key
+### 3. Add your API keys
 ```bash
 cp .env.example .env
 ```
-Open `.env` and replace `your_api_key_here` with your key from https://console.anthropic.com/
+Open `.env` and fill in:
+- `ANTHROPIC_API_KEY` — from https://console.anthropic.com/
+- `KLING_API_KEY` — from https://klingai.com/dev
 
-### 4. Add your topics
-Edit `topics.csv`. Each row needs three columns:
-```
-topic,type,tone
-"Your topic here",blog_post,professional
-```
-
-### 5. Run
+### 4. Run
 ```bash
-python3 run.py
+python3 web_app.py
 ```
 
-Generated files appear in the `output/` folder, one `.txt` file per topic.
+Open your browser to **http://localhost:5000**
 
-## Options
+## Content tab
+- Type topics (one per line)
+- Pick content type and tone
+- Click **Generate Content**
+- Copy individual results or download all as ZIP
 
-```bash
-python3 run.py --topics my_topics.csv --output my_output --delay 2
-```
-
-| Flag | Default | Description |
-|---|---|---|
-| `--topics` | `topics.csv` | Path to your topics file |
-| `--output` | `output` | Folder where results are saved |
-| `--delay` | `1.0` | Seconds between API calls |
-
-## Plain text input (alternative to CSV)
-
-You can also pass a plain `.txt` file with one topic per line:
-```bash
-python3 run.py --topics my_topics.txt
-```
-Topics loaded this way default to `blog_post` type and `professional` tone.
+## AI Video tab
+1. Upload a clear photo of yourself or your AI influencer
+2. Enter what the video is about and click **Write Script** (Claude generates a 30-second script)
+3. Edit the script if needed
+4. Pick duration (5 or 10 seconds)
+5. Click **Generate Video** — Kling AI will render it in 2–4 minutes
+6. Preview and download the finished video
