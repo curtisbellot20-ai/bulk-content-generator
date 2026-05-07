@@ -6,344 +6,298 @@
   <title>AI Video Generator</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0f0f11;color:#f0f0f2;min-height:100vh}
-    header{padding:20px 32px;border-bottom:1px solid #222;display:flex;align-items:center;gap:12px;background:#18181b}
-    header h1{font-size:1.25rem;font-weight:700;letter-spacing:-0.3px}
-    header .sub{font-size:0.85rem;color:#888;margin-left:4px}
-    .tabs{display:flex;gap:2px;padding:24px 32px 0;max-width:1100px;margin:0 auto}
-    .tab-btn{padding:9px 22px;border:none;border-radius:8px 8px 0 0;font-size:0.9rem;font-weight:500;cursor:pointer;background:#222;color:#aaa;transition:all .15s}
-    .tab-btn.active{background:#1e1e2e;color:#a78bfa}
-    .wrap{max-width:1100px;margin:0 auto;padding:0 32px 60px}
-    .tab-panel{display:none}
-    .tab-panel.active{display:block}
-    .card{background:#1e1e2e;border:1px solid #2a2a3a;border-radius:0 12px 12px 12px;padding:28px;margin-bottom:20px}
-    .card+.card{border-radius:12px}
-    h2{font-size:1rem;font-weight:600;margin-bottom:18px;color:#c4b5fd}
-    label{display:block;font-size:0.85rem;font-weight:500;margin-bottom:6px;color:#aaa}
-    textarea,input[type=text]{width:100%;background:#13131a;border:1px solid #333;border-radius:8px;padding:12px;font-size:0.9rem;color:#f0f0f2;font-family:inherit;resize:vertical;transition:border .2s}
-    textarea:focus,input:focus,select:focus{outline:none;border-color:#7c3aed}
-    textarea{min-height:140px}
-    select{width:100%;background:#13131a;border:1px solid #333;border-radius:8px;padding:10px 12px;font-size:0.9rem;color:#f0f0f2;font-family:inherit}
-    .row{display:flex;gap:16px;margin-top:16px}
-    .row>div{flex:1}
-    .btn{display:inline-flex;align-items:center;gap:8px;background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:11px 26px;font-size:0.95rem;font-weight:600;cursor:pointer;transition:background .2s}
-    .btn:hover:not(:disabled){background:#6d28d9}
-    .btn:disabled{background:#444;color:#888;cursor:not-allowed}
-    .btn-outline{background:transparent;color:#a78bfa;border:1.5px solid #7c3aed}
-    .btn-outline:hover:not(:disabled){background:#2d1b69}
-    .btn-sm{padding:8px 16px;font-size:0.85rem}
-    .btn-green{background:#059669}
-    .btn-green:hover:not(:disabled){background:#047857}
-    /* Upload zones */
-    .upload-zone{border:2px dashed #333;border-radius:10px;padding:28px;text-align:center;cursor:pointer;transition:border .2s;position:relative;background:#13131a}
-    .upload-zone:hover,.upload-zone.drag{border-color:#7c3aed;background:#1a1230}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0c0c0f;color:#f0f0f2;min-height:100vh}
+    header{padding:22px 36px;border-bottom:1px solid #1e1e28;background:#111116;display:flex;align-items:center;gap:14px}
+    header h1{font-size:1.2rem;font-weight:700;letter-spacing:-.3px}
+    header p{font-size:0.82rem;color:#555;margin-top:2px}
+    .page{max-width:960px;margin:0 auto;padding:36px 28px 80px}
+
+    /* Steps */
+    .step{margin-bottom:32px}
+    .step-header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+    .step-num{width:28px;height:28px;border-radius:50%;background:#5b21b6;color:#fff;font-size:0.8rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .step-title{font-size:1rem;font-weight:600;color:#e0d9ff}
+    .step-sub{font-size:0.8rem;color:#555;margin-top:2px}
+
+    /* Upload zone */
+    .upload-zone{border:2px dashed #2a2a3a;border-radius:12px;padding:32px 20px;text-align:center;cursor:pointer;transition:all .2s;position:relative;background:#111116}
+    .upload-zone:hover,.upload-zone.drag{border-color:#7c3aed;background:#16102a}
     .upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
-    .upload-icon{font-size:2rem;margin-bottom:8px}
-    .upload-hint{font-size:0.82rem;color:#666;margin-top:4px}
-    /* Image thumbnails */
-    .thumb-grid{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
-    .thumb{width:72px;height:72px;border-radius:8px;object-fit:cover;border:2px solid #333}
-    .thumb-count{background:#7c3aed;color:#fff;font-size:0.8rem;font-weight:700;border-radius:6px;padding:4px 10px;margin-top:10px;display:inline-block}
-    /* Script separator hint */
-    .hint-box{background:#13131a;border:1px solid #2a2a3a;border-radius:8px;padding:12px 16px;font-size:0.82rem;color:#888;margin-bottom:12px;line-height:1.6}
-    .hint-box code{color:#a78bfa;background:#2a1f4a;padding:1px 6px;border-radius:4px}
+    .upload-icon{font-size:2.2rem;margin-bottom:10px}
+    .upload-label{font-weight:600;font-size:0.95rem}
+    .upload-sub{font-size:0.8rem;color:#555;margin-top:4px}
+    .thumb-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+    .thumb{width:64px;height:64px;border-radius:8px;object-fit:cover;border:2px solid #2a2a3a}
+    .img-badge{font-size:0.78rem;background:#5b21b6;color:#fff;padding:3px 10px;border-radius:99px;margin-top:10px;display:inline-block}
+
+    /* Inputs */
+    input[type=text],textarea{width:100%;background:#111116;border:1px solid #2a2a3a;border-radius:10px;padding:13px 16px;font-size:0.95rem;color:#f0f0f2;font-family:inherit;transition:border .2s}
+    input[type=text]:focus,textarea:focus{outline:none;border-color:#7c3aed}
+    input[type=text]::placeholder{color:#3a3a4a}
+
+    /* Controls row */
+    .controls{display:flex;gap:12px;margin-top:16px;flex-wrap:wrap}
+    .control-group{display:flex;flex-direction:column;gap:6px}
+    .control-label{font-size:0.78rem;color:#777;font-weight:500;text-transform:uppercase;letter-spacing:.5px}
+    .pill-row{display:flex;gap:6px}
+    .pill{padding:7px 16px;border-radius:99px;border:1.5px solid #2a2a3a;background:transparent;color:#888;font-size:0.85rem;cursor:pointer;transition:all .15s;white-space:nowrap}
+    .pill.active{border-color:#7c3aed;background:#2d1b69;color:#c4b5fd;font-weight:600}
+    select{background:#111116;border:1.5px solid #2a2a3a;border-radius:8px;padding:8px 12px;font-size:0.85rem;color:#f0f0f2;font-family:inherit}
+    select:focus{outline:none;border-color:#7c3aed}
+
+    /* Generate button */
+    .gen-btn{width:100%;padding:15px;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;transition:opacity .2s;display:flex;align-items:center;justify-content:center;gap:10px;letter-spacing:.2px}
+    .gen-btn:hover:not(:disabled){opacity:.9}
+    .gen-btn:disabled{opacity:.4;cursor:not-allowed}
+
+    /* Status */
+    #status{margin-top:14px;font-size:0.88rem;color:#666;min-height:18px;text-align:center}
+    .progress-wrap{background:#1e1e28;border-radius:99px;height:4px;margin-top:10px;display:none}
+    .progress-bar{height:4px;border-radius:99px;background:linear-gradient(90deg,#7c3aed,#4f46e5);transition:width .5s;width:0%}
+
+    /* Divider */
+    .divider{border:none;border-top:1px solid #1e1e28;margin:36px 0}
+
     /* Video grid */
-    .video-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:16px}
-    .video-card{background:#13131a;border:1px solid #2a2a3a;border-radius:10px;padding:16px}
-    .video-card .vc-num{font-size:0.75rem;font-weight:700;color:#7c3aed;margin-bottom:6px}
-    .video-card .vc-preview{font-size:0.82rem;color:#aaa;margin-bottom:10px;line-height:1.4;min-height:36px}
-    .video-card .vc-status{font-size:0.8rem;font-weight:600;display:flex;align-items:center;gap:6px}
-    .status-queued{color:#888}
-    .status-processing{color:#f59e0b}
-    .status-done{color:#34d399}
-    .status-failed{color:#f87171}
-    .vc-actions{margin-top:10px}
-    .vc-actions a{font-size:0.8rem;color:#a78bfa;text-decoration:none}
-    .vc-actions a:hover{text-decoration:underline}
-    /* Progress */
-    .progress-wrap{background:#2a2a3a;border-radius:99px;height:5px;margin-top:12px;display:none}
-    .progress-bar{height:5px;border-radius:99px;background:#7c3aed;transition:width .4s;width:0%}
-    #vstatus,#cstatus{margin-top:12px;font-size:0.88rem;color:#888;min-height:18px}
-    /* Toggle pills */
-    .toggle-row{display:flex;gap:8px;margin-top:8px}
-    .toggle-pill{padding:7px 18px;border-radius:99px;border:1.5px solid #333;background:transparent;color:#aaa;font-size:0.85rem;cursor:pointer;transition:all .15s}
-    .toggle-pill.active{border-color:#7c3aed;background:#2d1b69;color:#c4b5fd}
-    /* Spinner */
-    .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+    #videoSection{display:none}
+    .grid-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+    .grid-title{font-size:1rem;font-weight:600;color:#e0d9ff}
+    .grid-summary{font-size:0.82rem;color:#555}
+    .video-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+    .vc{background:#111116;border:1px solid #1e1e28;border-radius:12px;padding:18px;transition:border .2s}
+    .vc.done{border-color:#065f46}
+    .vc.failed{border-color:#7f1d1d}
+    .vc-num{font-size:0.7rem;font-weight:700;color:#7c3aed;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px}
+    .vc-script{font-size:0.88rem;color:#d0d0e0;line-height:1.5;margin-bottom:8px}
+    .vc-motion{font-size:0.75rem;color:#555;font-style:italic;margin-bottom:12px;line-height:1.4}
+    .vc-status{font-size:0.8rem;font-weight:600;display:flex;align-items:center;gap:6px}
+    .s-queued{color:#555}
+    .s-processing{color:#f59e0b}
+    .s-done{color:#34d399}
+    .s-failed{color:#f87171}
+    .vc-links{margin-top:10px;display:flex;gap:12px}
+    .vc-links a{font-size:0.8rem;color:#a78bfa;text-decoration:none}
+    .vc-links a:hover{text-decoration:underline}
+
+    /* Download bar */
+    #dlBar{display:none;margin-top:20px;background:#0a1f14;border:1px solid #065f46;border-radius:10px;padding:16px 20px;align-items:center;justify-content:space-between;gap:12px}
+    .dl-msg{font-size:0.9rem;color:#34d399;font-weight:600}
+    .dl-btn{background:#059669;color:#fff;border:none;border-radius:8px;padding:10px 22px;font-size:0.88rem;font-weight:600;cursor:pointer;transition:background .2s}
+    .dl-btn:hover{background:#047857}
+
+    .spinner{display:inline-block;width:16px;height:16px;border:2.5px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
-    .step-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;background:#7c3aed;color:#fff;border-radius:50%;font-size:0.72rem;font-weight:700;margin-right:8px;flex-shrink:0}
-    .section-row{display:flex;align-items:center;margin-bottom:6px}
-    .download-bar{display:none;margin-top:20px;padding:16px;background:#0d2818;border:1px solid #064e2e;border-radius:10px;display:flex;align-items:center;justify-content:space-between;gap:12px}
-    .dl-text{font-size:0.9rem;color:#34d399;font-weight:500}
   </style>
 </head>
 <body>
 
 <header>
-  <span style="font-size:1.3rem">&#9889;</span>
-  <h1>AI Video Generator <span class="sub">Powered by Claude + Kling AI</span></h1>
+  <span style="font-size:1.5rem">&#9889;</span>
+  <div>
+    <h1>AI Video Generator</h1>
+    <p>Idea &rarr; Scripts &rarr; Kling AI videos &mdash; fully automated</p>
+  </div>
 </header>
 
-<div style="max-width:1100px;margin:0 auto;padding:0 32px">
-  <div class="tabs">
-    <button class="tab-btn active" onclick="switchTab('video',this)">&#127916; Bulk Video</button>
-    <button class="tab-btn" onclick="switchTab('scripts',this)">&#9997; Write Scripts</button>
-  </div>
-</div>
+<div class="page">
 
-<div class="wrap">
-
-<!-- ══ BULK VIDEO TAB ══ -->
-<div id="tab-video" class="tab-panel active">
-  <div class="card">
-
-    <!-- Step 1: Images -->
-    <div class="section-row"><span class="step-badge">1</span><h2 style="margin:0">Upload your photos / AI influencer images</h2></div>
-    <p style="font-size:0.83rem;color:#666;margin-bottom:12px">Upload 1–20 images. Videos will use them in rotation or randomly.</p>
+  <!-- Step 1: Images -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">1</div>
+      <div>
+        <div class="step-title">Upload your photos</div>
+        <div class="step-sub">1&ndash;20 images of yourself or your AI influencer</div>
+      </div>
+    </div>
     <div class="upload-zone" id="imgZone">
       <input type="file" id="imgInput" accept="image/jpeg,image/png,image/webp" multiple onchange="handleImages(this)" />
       <div class="upload-icon">&#128247;</div>
-      <div style="font-weight:600">Click to choose photos</div>
-      <div class="upload-hint">JPG · PNG · WebP &nbsp;|&nbsp; Up to 20 images</div>
+      <div class="upload-label">Click to choose photos</div>
+      <div class="upload-sub">JPG &middot; PNG &middot; WebP &nbsp;&bull;&nbsp; Up to 20</div>
     </div>
-    <div class="thumb-grid" id="thumbGrid"></div>
-    <div id="imgStatus" style="margin-top:10px;font-size:0.83rem;color:#888"></div>
+    <div class="thumb-row" id="thumbRow"></div>
+    <div id="imgMsg" style="margin-top:8px;font-size:0.82rem;color:#555"></div>
+  </div>
 
-    <!-- Step 2: Scripts -->
-    <div class="section-row" style="margin-top:28px"><span class="step-badge">2</span><h2 style="margin:0">Add your scripts</h2></div>
-    <div class="hint-box">
-      Paste 5–20 scripts separated by <code>---</code> on its own line.<br>
-      Each section = one video. Or upload a <code>.txt</code> file with the same format.
-    </div>
-    <div style="display:flex;gap:10px;margin-bottom:10px">
-      <label style="margin:0" class="btn btn-outline btn-sm" style="cursor:pointer">
-        &#128196; Upload .txt file
-        <input type="file" id="scriptFile" accept=".txt" style="display:none" onchange="loadScriptFile(this)" />
-      </label>
-    </div>
-    <textarea id="scriptsArea" placeholder="Script one — talk about your first topic here...
-
----
-
-Script two — a completely different topic or a continuation...
-
----
-
-Script three..."></textarea>
-    <div id="scriptCount" style="margin-top:6px;font-size:0.82rem;color:#888"></div>
-
-    <!-- Step 3: Settings -->
-    <div class="section-row" style="margin-top:28px"><span class="step-badge">3</span><h2 style="margin:0">Settings</h2></div>
-    <div class="row">
+  <!-- Step 2: Idea -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">2</div>
       <div>
-        <label>Image selection</label>
-        <div class="toggle-row">
-          <button class="toggle-pill active" id="pill-rotation" onclick="setImageMode('rotation')">&#128260; Rotation</button>
-          <button class="toggle-pill" id="pill-random" onclick="setImageMode('random')">&#127922; Random</button>
+        <div class="step-title">What are the videos about?</div>
+        <div class="step-sub">One idea or theme &mdash; Claude writes every script and motion prompt automatically</div>
+      </div>
+    </div>
+    <input type="text" id="theme" placeholder="e.g. anime rage bait, gym motivation, cooking hacks, travel tips..." />
+  </div>
+
+  <!-- Step 3: Settings -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">3</div>
+      <div>
+        <div class="step-title">Settings</div>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="control-group">
+        <div class="control-label">Number of videos</div>
+        <div class="pill-row">
+          <button class="pill active" onclick="setCount(5,this)">5</button>
+          <button class="pill" onclick="setCount(10,this)">10</button>
+          <button class="pill" onclick="setCount(15,this)">15</button>
+          <button class="pill" onclick="setCount(20,this)">20</button>
         </div>
       </div>
-      <div>
-        <label>Video duration per clip</label>
-        <select id="duration">
-          <option value="5">5 seconds</option>
-          <option value="10">10 seconds</option>
-        </select>
+      <div class="control-group">
+        <div class="control-label">Image order</div>
+        <div class="pill-row">
+          <button class="pill active" id="pill-rot" onclick="setMode('rotation')">&#128260; Rotation</button>
+          <button class="pill" id="pill-rand" onclick="setMode('random')">&#127922; Random</button>
+        </div>
       </div>
-    </div>
-
-    <!-- Generate -->
-    <button class="btn" id="genBtn" onclick="generateVideos()" style="margin-top:24px">
-      <span id="genBtnText">&#127916; Generate Videos</span>
-      <span id="genSpinner" style="display:none"><span class="spinner"></span></span>
-    </button>
-    <div id="vstatus"></div>
-    <div class="progress-wrap" id="vprogressWrap"><div class="progress-bar" id="vprogressBar"></div></div>
-  </div>
-
-  <!-- Video progress grid -->
-  <div id="videoSection" style="display:none">
-    <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-        <h2 style="margin:0">Videos</h2>
-        <span id="videoSummary" style="font-size:0.85rem;color:#888"></span>
-      </div>
-      <div class="video-grid" id="videoGrid"></div>
-      <div id="downloadBar" style="display:none;margin-top:20px;padding:16px;background:#0d2818;border:1px solid #064e2e;border-radius:10px;align-items:center;justify-content:space-between;gap:12px">
-        <span class="dl-text">&#10003; All videos ready!</span>
-        <button class="btn btn-green btn-sm" onclick="downloadAll()">&#8681; Download All as ZIP</button>
+      <div class="control-group">
+        <div class="control-label">Clip length</div>
+        <div class="pill-row">
+          <button class="pill active" onclick="setDuration(5,this)">5 sec</button>
+          <button class="pill" onclick="setDuration(10,this)">10 sec</button>
+        </div>
       </div>
     </div>
   </div>
+
+  <!-- Generate -->
+  <button class="gen-btn" id="genBtn" onclick="generate()">
+    <span id="genText">&#9889; Generate Videos</span>
+    <span id="genSpinner" style="display:none"><span class="spinner"></span></span>
+  </button>
+  <div id="status"></div>
+  <div class="progress-wrap" id="progressWrap"><div class="progress-bar" id="progressBar"></div></div>
+
+  <hr class="divider" />
+
+  <!-- Video grid -->
+  <div id="videoSection">
+    <div class="grid-header">
+      <div class="grid-title">Videos</div>
+      <div class="grid-summary" id="gridSummary"></div>
+    </div>
+    <div class="video-grid" id="videoGrid"></div>
+    <div id="dlBar">
+      <span class="dl-msg">&#10003; Videos ready!</span>
+      <button class="dl-btn" onclick="downloadAll()">&#8681; Download All as ZIP</button>
+    </div>
+  </div>
+
 </div>
-
-<!-- ══ WRITE SCRIPTS TAB ══ -->
-<div id="tab-scripts" class="tab-panel">
-  <div class="card">
-    <h2>Write scripts with Claude AI</h2>
-    <p style="font-size:0.83rem;color:#666;margin-bottom:16px">Enter one topic per line. Claude writes a 30-second spoken script for each. Copy them into the Bulk Video tab.</p>
-    <label>Topics <span style="color:#666;font-weight:400">(one per line)</span></label>
-    <textarea id="topicsArea" placeholder="3 tips for better sleep
-Why you should drink more water
-Morning routine for success"></textarea>
-    <div class="row" style="margin-top:12px">
-      <div>
-        <label>Tone</label>
-        <select id="scriptTone">
-          <option value="friendly">Friendly</option>
-          <option value="professional">Professional</option>
-          <option value="excited">Excited</option>
-          <option value="casual">Casual</option>
-          <option value="motivational">Motivational</option>
-          <option value="humorous">Humorous</option>
-        </select>
-      </div>
-    </div>
-    <button class="btn" id="writeBtn" onclick="writeScripts()" style="margin-top:16px">
-      <span id="writeBtnText">Write Scripts</span>
-      <span id="writeSpinner" style="display:none"><span class="spinner"></span></span>
-    </button>
-    <div id="cstatus"></div>
-    <div id="generatedScripts" style="display:none;margin-top:20px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <label style="margin:0">Generated scripts</label>
-        <button class="btn btn-outline btn-sm" onclick="copyToVideoTab()">&#8594; Copy to Video Tab</button>
-      </div>
-      <textarea id="generatedArea" style="min-height:300px;font-family:monospace;font-size:0.85rem"></textarea>
-    </div>
-  </div>
-</div>
-
-</div><!-- /wrap -->
 
 <script>
 const SESSION_ID = "{{ session_id }}";
+let videoCount = 5;
 let imageMode = "rotation";
+let clipDuration = 5;
 let currentTaskIds = [];
 let pollTimer = null;
 
-function switchTab(name, btn) {
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('tab-' + name).classList.add('active');
+// ── Pill helpers ──
+function setCount(n, btn) {
+  videoCount = n;
+  btn.closest('.pill-row').querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
   btn.classList.add('active');
 }
-
-function setImageMode(mode) {
-  imageMode = mode;
-  document.getElementById('pill-rotation').classList.toggle('active', mode === 'rotation');
-  document.getElementById('pill-random').classList.toggle('active', mode === 'random');
+function setMode(m) {
+  imageMode = m;
+  document.getElementById('pill-rot').classList.toggle('active', m === 'rotation');
+  document.getElementById('pill-rand').classList.toggle('active', m === 'random');
+}
+function setDuration(d, btn) {
+  clipDuration = d;
+  btn.closest('.pill-row').querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
 }
 
 // ── Images ──
 async function handleImages(input) {
   const files = Array.from(input.files);
   if (!files.length) return;
-  if (files.length > 20) { setVStatus('Maximum 20 images.', 'red'); return; }
-
-  setVStatus('Uploading images...');
+  if (files.length > 20) { setStatus('Maximum 20 images.', 'red'); return; }
+  setStatus('Uploading images...');
   const form = new FormData();
   form.append('session_id', SESSION_ID);
   files.forEach(f => form.append('images', f));
-
   try {
     const res = await fetch('/session/images', { method: 'POST', body: form });
     const data = await res.json();
-    if (data.error) { setVStatus(data.error, 'red'); return; }
-    setVStatus(`${data.count} image${data.count > 1 ? 's' : ''} uploaded.`, 'green');
+    if (data.error) { setStatus(data.error, 'red'); return; }
+    setStatus('');
+    document.getElementById('imgMsg').textContent = data.count + ' image' + (data.count > 1 ? 's' : '') + ' ready';
     renderThumbs(files);
-  } catch(e) { setVStatus('Upload failed.', 'red'); }
+  } catch(e) { setStatus('Upload failed.', 'red'); }
 }
-
 function renderThumbs(files) {
-  const grid = document.getElementById('thumbGrid');
-  grid.innerHTML = '';
-  files.forEach(f => {
+  const row = document.getElementById('thumbRow');
+  row.innerHTML = '';
+  files.slice(0, 20).forEach(f => {
     const img = document.createElement('img');
     img.className = 'thumb';
     img.src = URL.createObjectURL(f);
-    grid.appendChild(img);
+    row.appendChild(img);
   });
-  const badge = document.createElement('div');
-  badge.className = 'thumb-count';
-  badge.textContent = files.length + ' image' + (files.length > 1 ? 's' : '') + ' ready';
-  grid.appendChild(badge);
 }
 
-// ── Script file upload ──
-function loadScriptFile(input) {
-  const file = input.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    document.getElementById('scriptsArea').value = e.target.result;
-    updateScriptCount();
-  };
-  reader.readAsText(file);
-}
+// ── Generate ──
+async function generate() {
+  const theme = document.getElementById('theme').value.trim();
+  if (!theme) { setStatus('Enter a content idea first.', 'red'); return; }
 
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('scriptsArea').addEventListener('input', updateScriptCount);
-});
-
-function parseScripts() {
-  const raw = document.getElementById('scriptsArea').value;
-  return raw.split(/^---$/m).map(s => s.trim()).filter(Boolean);
-}
-
-function updateScriptCount() {
-  const scripts = parseScripts();
-  const el = document.getElementById('scriptCount');
-  if (scripts.length === 0) { el.textContent = ''; return; }
-  el.textContent = `${scripts.length} script${scripts.length > 1 ? 's' : ''} detected → ${scripts.length} video${scripts.length > 1 ? 's' : ''} will be generated`;
-  el.style.color = scripts.length > 20 ? '#f87171' : '#a78bfa';
-}
-
-// ── Generate videos ──
-async function generateVideos() {
-  const scripts = parseScripts();
-  const duration = document.getElementById('duration').value;
-
-  if (scripts.length === 0) { setVStatus('Paste at least one script.', 'red'); return; }
-  if (scripts.length > 20) { setVStatus('Maximum 20 scripts per batch.', 'red'); return; }
-
-  setBtnLoading('genBtn', 'genBtnText', 'genSpinner', true, 'Starting...');
-  setVStatus('Submitting to Kling AI...');
-  setProgress(10);
+  setBusy(true, 'Writing scripts with Claude...');
+  setProgress(5);
   clearInterval(pollTimer);
   currentTaskIds = [];
+  document.getElementById('videoSection').style.display = 'none';
+  document.getElementById('dlBar').style.display = 'none';
 
   try {
-    const res = await fetch('/generate/videos', {
+    const res = await fetch('/generate', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ session_id: SESSION_ID, scripts, image_mode: imageMode, duration })
+      body: JSON.stringify({
+        session_id: SESSION_ID,
+        theme,
+        count: videoCount,
+        image_mode: imageMode,
+        duration: clipDuration
+      })
     });
     const data = await res.json();
-    if (data.error) { setVStatus(data.error, 'red'); setBtnLoading('genBtn','genBtnText','genSpinner',false,'&#127916; Generate Videos'); return; }
+    if (data.error) { setStatus(data.error, 'red'); setBusy(false); return; }
 
     currentTaskIds = data.tasks.map(t => t.task_id);
-    renderVideoGrid(data.tasks);
+    renderGrid(data.tasks);
     document.getElementById('videoSection').style.display = 'block';
-    setVStatus(`${scripts.length} video${scripts.length > 1 ? 's' : ''} submitted. Kling AI is rendering them — this takes 2–5 minutes per video...`);
+    setStatus('Scripts done — Kling AI is rendering your videos. Check back in 3–5 minutes...');
+    setProgress(15);
     pollVideos();
   } catch(e) {
-    setVStatus('Something went wrong.', 'red');
-    setBtnLoading('genBtn','genBtnText','genSpinner',false,'&#127916; Generate Videos');
+    setStatus('Something went wrong. Make sure the server is running.', 'red');
+    setBusy(false);
   }
 }
 
-function renderVideoGrid(tasks) {
+function renderGrid(tasks) {
   const grid = document.getElementById('videoGrid');
   grid.innerHTML = '';
   tasks.forEach((t, i) => {
     const card = document.createElement('div');
-    card.className = 'video-card';
+    card.className = 'vc';
     card.id = 'vc-' + t.task_id;
     card.innerHTML = `
-      <div class="vc-num">VIDEO ${i+1}</div>
-      <div class="vc-preview">${escHtml(t.preview)}</div>
-      <div class="vc-status status-queued" id="vs-${t.task_id}">&#9679; Queued</div>
-      <div class="vc-actions" id="va-${t.task_id}"></div>`;
+      <div class="vc-num">Video ${i + 1}</div>
+      <div class="vc-script">${escHtml(t.script)}</div>
+      <div class="vc-motion">&#128247; ${escHtml(t.motion)}</div>
+      <div class="vc-status s-queued" id="vs-${t.task_id}">&#9675; Queued</div>
+      <div class="vc-links" id="vl-${t.task_id}"></div>`;
     grid.appendChild(card);
   });
 }
@@ -351,7 +305,6 @@ function renderVideoGrid(tasks) {
 function pollVideos() {
   let dots = 0;
   pollTimer = setInterval(async () => {
-    if (!currentTaskIds.length) return;
     dots = (dots + 1) % 4;
     try {
       const res = await fetch('/status/videos', {
@@ -364,44 +317,47 @@ function pollVideos() {
 
       currentTaskIds.forEach(tid => {
         const t = data[tid] || {};
-        const statusEl = document.getElementById('vs-' + tid);
-        const actionEl = document.getElementById('va-' + tid);
-        if (!statusEl) return;
-
+        const sEl = document.getElementById('vs-' + tid);
+        const lEl = document.getElementById('vl-' + tid);
+        const card = document.getElementById('vc-' + tid);
+        if (!sEl) return;
         if (t.status === 'done') {
           done++;
-          statusEl.className = 'vc-status status-done';
-          statusEl.textContent = '✓ Done';
-          if (actionEl && t.url) {
-            actionEl.innerHTML = `<a href="${t.url}" target="_blank">&#9654; Preview</a> &nbsp; <a href="${t.url}" download>&#8681; Download</a>`;
+          card.classList.add('done');
+          sEl.className = 'vc-status s-done';
+          sEl.textContent = '✓ Done';
+          if (lEl && t.url && !lEl.innerHTML) {
+            lEl.innerHTML = `<a href="${t.url}" target="_blank">&#9654; Preview</a><a href="${t.url}" download>&#8681; Save</a>`;
           }
         } else if (t.status === 'failed') {
           failed++;
-          statusEl.className = 'vc-status status-failed';
-          statusEl.textContent = '✗ Failed: ' + (t.error || 'Unknown error');
+          card.classList.add('failed');
+          sEl.className = 'vc-status s-failed';
+          sEl.textContent = '✗ ' + (t.error || 'Failed');
         } else if (t.status === 'processing') {
           processing++;
-          statusEl.className = 'vc-status status-processing';
-          statusEl.textContent = '▶ Rendering' + '.'.repeat(dots + 1);
+          sEl.className = 'vc-status s-processing';
+          sEl.textContent = '▶ Rendering' + '.'.repeat(dots + 1);
         } else {
           queued++;
-          statusEl.className = 'vc-status status-queued';
-          statusEl.textContent = '○ Queued';
+          sEl.className = 'vc-status s-queued';
+          sEl.textContent = '○ Queued';
         }
       });
 
       const total = currentTaskIds.length;
-      const pct = Math.round((done + failed) / total * 100);
-      setProgress(Math.max(pct, 5));
-      document.getElementById('videoSummary').textContent = `${done} done, ${processing} rendering, ${queued} queued, ${failed} failed`;
+      const pct = Math.round((done + failed) / total * 90) + 10;
+      setProgress(Math.min(pct, 95));
+      document.getElementById('gridSummary').textContent =
+        `${done} done · ${processing} rendering · ${queued} queued · ${failed} failed`;
 
       if (done + failed === total) {
         clearInterval(pollTimer);
-        setBtnLoading('genBtn','genBtnText','genSpinner',false,'&#127916; Generate Videos');
-        setVStatus(`Finished! ${done} succeeded, ${failed} failed.`, done > 0 ? 'green' : 'red');
+        setBusy(false);
         setProgress(100);
+        setStatus(`Finished! ${done} video${done !== 1 ? 's' : ''} ready${failed ? ', ' + failed + ' failed' : ''}.`, done > 0 ? 'green' : 'red');
         if (done > 0) {
-          const bar = document.getElementById('downloadBar');
+          const bar = document.getElementById('dlBar');
           bar.style.display = 'flex';
         }
       }
@@ -410,7 +366,7 @@ function pollVideos() {
 }
 
 async function downloadAll() {
-  setVStatus('Building ZIP...');
+  setStatus('Building ZIP...');
   const res = await fetch('/download/videos', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
@@ -421,60 +377,23 @@ async function downloadAll() {
   a.href = URL.createObjectURL(blob);
   a.download = 'videos.zip';
   a.click();
-  setVStatus('ZIP downloaded!', 'green');
-}
-
-// ── Write Scripts (Claude) ──
-async function writeScripts() {
-  const topics = document.getElementById('topicsArea').value.trim();
-  const tone = document.getElementById('scriptTone').value;
-  if (!topics) { setCStatus('Enter at least one topic.', 'red'); return; }
-  setBtnLoading('writeBtn','writeBtnText','writeSpinner',true,'Writing...');
-  setCStatus('Claude is writing your scripts...');
-  try {
-    const res = await fetch('/generate/scripts', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({topics, tone})
-    });
-    const data = await res.json();
-    if (data.error) { setCStatus(data.error, 'red'); return; }
-    const combined = data.scripts.join('\n\n---\n\n');
-    document.getElementById('generatedArea').value = combined;
-    document.getElementById('generatedScripts').style.display = 'block';
-    setCStatus(`${data.scripts.length} script${data.scripts.length > 1 ? 's' : ''} written.`, 'green');
-  } catch(e) { setCStatus('Failed.', 'red'); }
-  setBtnLoading('writeBtn','writeBtnText','writeSpinner',false,'Write Scripts');
-}
-
-function copyToVideoTab() {
-  const text = document.getElementById('generatedArea').value;
-  document.getElementById('scriptsArea').value = text;
-  updateScriptCount();
-  switchTab('video', document.querySelector('.tab-btn'));
-  document.querySelector('.tab-btn').classList.add('active');
-  document.querySelectorAll('.tab-btn')[1].classList.remove('active');
+  setStatus('Downloaded!', 'green');
 }
 
 // ── Helpers ──
-function setBtnLoading(btnId, textId, spinnerId, on, label) {
-  const btn = document.getElementById(btnId);
-  if (btn) btn.disabled = on;
-  if (textId) document.getElementById(textId).innerHTML = label;
-  if (spinnerId) document.getElementById(spinnerId).style.display = on ? 'inline' : 'none';
+function setBusy(on, msg) {
+  document.getElementById('genBtn').disabled = on;
+  document.getElementById('genText').textContent = on ? msg : '⚡ Generate Videos';
+  document.getElementById('genSpinner').style.display = on ? 'inline' : 'none';
 }
-function setVStatus(msg, color) {
-  const el = document.getElementById('vstatus');
+function setStatus(msg, color) {
+  const el = document.getElementById('status');
   el.textContent = msg;
-  el.style.color = color === 'red' ? '#f87171' : color === 'green' ? '#34d399' : '#888';
-}
-function setCStatus(msg, color) {
-  const el = document.getElementById('cstatus');
-  el.textContent = msg;
-  el.style.color = color === 'red' ? '#f87171' : color === 'green' ? '#34d399' : '#888';
+  el.style.color = color === 'red' ? '#f87171' : color === 'green' ? '#34d399' : '#555';
 }
 function setProgress(pct) {
-  document.getElementById('vprogressWrap').style.display = 'block';
-  document.getElementById('vprogressBar').style.width = pct + '%';
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('progressBar').style.width = pct + '%';
 }
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
