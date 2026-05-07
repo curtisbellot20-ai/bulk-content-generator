@@ -12,11 +12,10 @@
       <span class="logo-icon">&#9654;</span>
       <span>Bulk Content Generator</span>
     </div>
-    <p class="tagline">Turn your images &amp; scripts into short-form videos — in bulk.</p>
+    <p class="tagline">Turn your AI images &amp; scripts into animated short-form videos &mdash; in bulk.</p>
   </header>
 
   <div class="wizard">
-    <!-- Step indicators -->
     <div class="steps">
       <div class="step active" id="ind-1"><span class="num">1</span><span class="label">Images</span></div>
       <div class="step" id="ind-2"><span class="num">2</span><span class="label">Scripts</span></div>
@@ -27,7 +26,7 @@
     <!-- STEP 1: Images -->
     <div class="panel active" id="panel-1">
       <h2>Upload Your Images</h2>
-      <p class="hint">Upload 1–20 images of yourself (AI photos work great). Videos will use these images with a slow zoom effect.</p>
+      <p class="hint">Upload 1&ndash;20 AI images or photos of yourself. Each video will be animated from one of these images via Kling AI.</p>
       <div class="drop-zone" id="drop-zone">
         <div class="drop-inner">
           <div class="drop-icon">&#128247;</div>
@@ -42,27 +41,39 @@
       </div>
     </div>
 
-    <!-- STEP 2: Scripts -->
+    <!-- STEP 2: Scripts + Prompts -->
     <div class="panel" id="panel-2">
       <h2>Enter Your Scripts</h2>
-      <p class="hint">Each script becomes one video. Separate scripts with a line of <code>---</code>. Or paste one long piece and use Run-On mode to split it automatically.</p>
+      <p class="hint">Separate scripts with a line of <code>---</code>. Each block becomes one video. Use Run-On mode in settings to split a single long script automatically.</p>
       <div class="script-example">
-        <strong>Example format:</strong>
-        <pre>Hey everyone! Today I want to share my top tips for growing on social media...
+        <strong>Example:</strong>
+        <pre>Hey everyone! Today I'm sharing my top tips for growing on social media fast...
 
 ---
 
-Did you know consistency is the #1 factor for algorithm growth? Here's why...
+Did you know consistency beats virality every single time? Here's proof...
 
 ---
 
-Let me show you exactly how I schedule my content for maximum reach...</pre>
+Here's the exact posting schedule I use to stay consistent and grow...</pre>
       </div>
-      <textarea id="scripts-input" placeholder="Paste your scripts here. Separate each script with ---" rows="14"></textarea>
+      <textarea id="scripts-input" placeholder="Paste your scripts here. Separate each script with ---" rows="12"></textarea>
       <div class="char-count" id="char-count">0 characters</div>
+
+      <div class="prompts-section">
+        <div class="prompts-header">
+          <div>
+            <strong>Visual Motion Prompts</strong>
+            <span class="badge">optional</span>
+          </div>
+          <p class="hint" style="margin:4px 0 0">One line per script block. Tells Kling how to animate each image (e.g. &ldquo;walking through a city, cinematic&rdquo;). Leave blank to auto-extract from the script.</p>
+        </div>
+        <textarea id="prompts-input" placeholder="walking confidently through golden hour light&#10;smiling at camera, slow zoom, bokeh background&#10;pointing to text overlay, dynamic energy" rows="5"></textarea>
+      </div>
+
       <div class="nav-row">
         <button class="btn btn-outline" onclick="goStep(1)">&larr; Back</button>
-        <button class="btn" id="next-2" onclick="goStep(3)">Next: Settings &rarr;</button>
+        <button class="btn" onclick="goStep(3)">Next: Settings &rarr;</button>
       </div>
     </div>
 
@@ -112,9 +123,68 @@ Let me show you exactly how I schedule my content for maximum reach...</pre>
         </div>
       </div>
 
+      <!-- Kling Settings -->
+      <div class="kling-card">
+        <div class="kling-header">
+          <span class="kling-logo">&#127916;</span>
+          <div>
+            <strong>Kling AI Animation</strong>
+            <span class="badge badge-purple">Powered by Kling</span>
+          </div>
+        </div>
+        <p class="hint" style="margin-bottom:16px">Without API keys the generator falls back to a static Ken Burns zoom. Keys in <code>.env</code> are loaded automatically; fields below override per session.</p>
+
+        <div class="key-row">
+          <div class="field-group">
+            <label class="field-label">Access Key</label>
+            <input type="password" id="kling-access" placeholder="From .env or enter here" autocomplete="off" />
+          </div>
+          <div class="field-group">
+            <label class="field-label">Secret Key</label>
+            <input type="password" id="kling-secret" placeholder="From .env or enter here" autocomplete="off" />
+          </div>
+        </div>
+
+        <div class="setting-group" style="margin-top:20px;margin-bottom:0">
+          <label>Clip Duration per Video</label>
+          <div class="radio-group">
+            <label class="radio-card active" id="rc-5s">
+              <input type="radio" name="clip-duration" value="5" checked />
+              <span class="rc-icon">&#9889;</span>
+              <span class="rc-title">5 seconds</span>
+              <span class="rc-desc">Faster &amp; cheaper, great for fast-paced edits</span>
+            </label>
+            <label class="radio-card" id="rc-10s">
+              <input type="radio" name="clip-duration" value="10" />
+              <span class="rc-icon">&#127908;</span>
+              <span class="rc-title">10 seconds</span>
+              <span class="rc-desc">More motion, better for narrative content</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-group" style="margin-top:16px;margin-bottom:0">
+          <label>Kling Quality Mode</label>
+          <div class="radio-group">
+            <label class="radio-card active" id="rc-std">
+              <input type="radio" name="kling-mode" value="std" checked />
+              <span class="rc-icon">&#9996;</span>
+              <span class="rc-title">Standard</span>
+              <span class="rc-desc">Fast generation, good quality</span>
+            </label>
+            <label class="radio-card" id="rc-pro">
+              <input type="radio" name="kling-mode" value="pro" />
+              <span class="rc-icon">&#11088;</span>
+              <span class="rc-title">Professional</span>
+              <span class="rc-desc">Higher fidelity, slower &amp; more credits</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
       <div class="nav-row">
         <button class="btn btn-outline" onclick="goStep(2)">&larr; Back</button>
-        <button class="btn" onclick="goStep(4)">Generate Videos &rarr;</button>
+        <button class="btn" onclick="goStep(4)">Review &amp; Generate &rarr;</button>
       </div>
     </div>
 
@@ -128,9 +198,9 @@ Let me show you exactly how I schedule my content for maximum reach...</pre>
       </div>
 
       <div id="gen-progress" style="display:none">
-        <div class="progress-label" id="progress-label">Generating video 0 of 0...</div>
+        <div class="progress-label" id="progress-label">Starting...</div>
         <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
-        <p class="progress-hint">This may take a few minutes. Videos will appear below as they finish.</p>
+        <p class="progress-hint">Kling generation takes 1&ndash;3 min per video. Videos appear below as they finish.</p>
       </div>
 
       <div id="video-list"></div>

@@ -1,45 +1,33 @@
 /* ---- State ---- */
 let sessionId = null;
-let uploadedImages = [];  // { filename, original, objectUrl }
+let uploadedImages = [];
 let jobId = null;
 let pollTimer = null;
 
 /* ---- Init ---- */
 document.addEventListener('DOMContentLoaded', async () => {
-  // Create session
   const res = await fetch('/api/session', { method: 'POST' });
   const data = await res.json();
   sessionId = data.session_id;
-
   setupDropZone();
   setupScriptInput();
-  setupSettings();
+  setupRadioCards();
 });
 
 /* ---- Drop Zone ---- */
 function setupDropZone() {
   const zone = document.getElementById('drop-zone');
   const fileInput = document.getElementById('file-input');
-
   zone.addEventListener('click', () => fileInput.click());
   zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
   zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
-  zone.addEventListener('drop', e => {
-    e.preventDefault();
-    zone.classList.remove('dragover');
-    handleFiles([...e.dataTransfer.files]);
-  });
-  fileInput.addEventListener('change', () => {
-    handleFiles([...fileInput.files]);
-    fileInput.value = '';
-  });
+  zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('dragover'); handleFiles([...e.dataTransfer.files]); });
+  fileInput.addEventListener('change', () => { handleFiles([...fileInput.files]); fileInput.value = ''; });
 }
 
 async function handleFiles(files) {
   const imageFiles = files.filter(f => f.type.startsWith('image/'));
-  const remaining = 20 - uploadedImages.length;
-  const toUpload = imageFiles.slice(0, remaining);
-
+  const toUpload = imageFiles.slice(0, 20 - uploadedImages.length);
   for (const file of toUpload) {
     const form = new FormData();
     form.append('image', file);
@@ -47,34 +35,24 @@ async function handleFiles(files) {
       const res = await fetch(`/api/upload-image/${sessionId}`, { method: 'POST', body: form });
       const data = await res.json();
       if (data.filename) {
-        const objectUrl = URL.createObjectURL(file);
-        uploadedImages.push({ filename: data.filename, original: file.name, objectUrl });
+        uploadedImages.push({ filename: data.filename, original: file.name, objectUrl: URL.createObjectURL(file) });
         renderImageGrid();
       }
-    } catch (e) {
-      console.error('Upload failed', e);
-    }
+    } catch (e) { console.error('Upload failed', e); }
   }
 }
 
 function renderImageGrid() {
   const grid = document.getElementById('image-grid');
-  const counter = document.getElementById('img-counter');
-  const nextBtn = document.getElementById('next-1');
-
   grid.innerHTML = '';
   uploadedImages.forEach((img, idx) => {
     const div = document.createElement('div');
     div.className = 'thumb';
-    div.innerHTML = `
-      <img src="${img.objectUrl}" alt="${img.original}" loading="lazy" />
-      <button class="del" title="Remove" onclick="removeImage(${idx})">&#10005;</button>
-    `;
+    div.innerHTML = `<img src="${img.objectUrl}" alt="${img.original}" loading="lazy" /><button class="del" onclick="removeImage(${idx})">&#10005;</button>`;
     grid.appendChild(div);
   });
-
-  counter.textContent = `${uploadedImages.length} / 20 images`;
-  nextBtn.disabled = uploadedImages.length === 0;
+  document.getElementById('img-counter').textContent = `${uploadedImages.length} / 20 images`;
+  document.getElementById('next-1').disabled = uploadedImages.length === 0;
 }
 
 async function removeImage(idx) {
@@ -85,56 +63,34 @@ async function removeImage(idx) {
   renderImageGrid();
 }
 
-/* ---- Scripts ---- */
+/* ---- Script input ---- */
 function setupScriptInput() {
   const ta = document.getElementById('scripts-input');
   const cc = document.getElementById('char-count');
-  ta.addEventListener('input', () => {
-    cc.textContent = `${ta.value.length} characters`;
-  });
+  ta.addEventListener('input', () => { cc.textContent = `${ta.value.length} characters`; });
 }
 
-/* ---- Settings ---- */
-function setupSettings() {
+/* ---- Radio cards ---- */
+function setupRadioCards() {
+  document.querySelectorAll('.radio-card input[type=radio]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      const name = radio.name;
+      document.querySelectorAll(`.radio-card input[name="${name}"]`).forEach(r => {
+        r.closest('.radio-card').classList.toggle('active', r === radio);
+      });
+    });
+  });
+
   const vc = document.getElementById('video-count');
-  const vcd = document.getElementById('vc-display');
-  vc.addEventListener('input', () => { vcd.textContent = vc.value; });
-
-  // Image mode radio cards
-  document.querySelectorAll('input[name="image-mode"]').forEach(radio => {
-    radio.addEventListener('change', () => {
-      document.querySelectorAll('.radio-card').forEach(c => {
-        if (c.querySelector('input[name="image-mode"]')) c.classList.remove('active');
-      });
-      radio.closest('.radio-card').classList.add('active');
-    });
-  });
-
-  // Script mode radio cards
-  document.querySelectorAll('input[name="script-mode"]').forEach(radio => {
-    radio.addEventListener('change', () => {
-      document.querySelectorAll('.radio-card').forEach(c => {
-        if (c.querySelector('input[name="script-mode"]')) c.classList.remove('active');
-      });
-      radio.closest('.radio-card').classList.add('active');
-    });
-  });
+  vc.addEventListener('input', () => { document.getElementById('vc-display').textContent = vc.value; });
 }
 
 /* ---- Navigation ---- */
 document.getElementById('next-1').addEventListener('click', () => goStep(2));
 
 function goStep(n) {
-  if (n === 2) {
-    // validate scripts on going forward
-  }
-  if (n === 4) {
-    buildSummary();
-  }
-
-  document.querySelectorAll('.panel').forEach((p, i) => {
-    p.classList.toggle('active', i + 1 === n);
-  });
+  if (n === 4) buildSummary();
+  document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i + 1 === n));
   document.querySelectorAll('.step').forEach((s, i) => {
     s.classList.remove('active', 'done');
     if (i + 1 === n) s.classList.add('active');
@@ -147,15 +103,21 @@ function buildSummary() {
   const vc = document.getElementById('video-count').value;
   const im = document.querySelector('input[name="image-mode"]:checked').value;
   const sm = document.querySelector('input[name="script-mode"]:checked').value;
+  const cd = document.querySelector('input[name="clip-duration"]:checked').value;
+  const km = document.querySelector('input[name="kling-mode"]:checked').value;
   const scripts = document.getElementById('scripts-input').value.trim();
-  const parts = scripts.split(/\n\s*-{3,}\s*\n/);
+  const scriptCount = scripts.split(/\n\s*-{3,}\s*\n/).length;
+  const hasKeys = document.getElementById('kling-access').value || document.getElementById('kling-secret').value;
 
   document.getElementById('gen-summary').innerHTML = `
-    <strong>${uploadedImages.length}</strong> image${uploadedImages.length !== 1 ? 's' : ''} uploaded &nbsp;·&nbsp;
-    <strong>${vc}</strong> videos &nbsp;·&nbsp;
-    <strong>${parts.length}</strong> script${parts.length !== 1 ? 's' : ''} detected &nbsp;·&nbsp;
-    Image mode: <strong>${im}</strong> &nbsp;·&nbsp;
-    Script mode: <strong>${sm}</strong>
+    <strong>${uploadedImages.length}</strong> image${uploadedImages.length !== 1 ? 's' : ''}
+    &nbsp;&middot;&nbsp; <strong>${vc}</strong> videos
+    &nbsp;&middot;&nbsp; <strong>${scriptCount}</strong> script${scriptCount !== 1 ? 's' : ''}
+    &nbsp;&middot;&nbsp; Image: <strong>${im}</strong>
+    &nbsp;&middot;&nbsp; Script: <strong>${sm}</strong><br/>
+    Clip: <strong>${cd}s</strong>
+    &nbsp;&middot;&nbsp; Quality: <strong>${km}</strong>
+    &nbsp;&middot;&nbsp; Kling: <strong>${hasKeys ? 'API key set (UI)' : 'from .env / fallback to static'}</strong>
   `;
 }
 
@@ -167,6 +129,11 @@ async function startGeneration() {
   const vc = parseInt(document.getElementById('video-count').value);
   const im = document.querySelector('input[name="image-mode"]:checked').value;
   const sm = document.querySelector('input[name="script-mode"]:checked').value;
+  const cd = document.querySelector('input[name="clip-duration"]:checked').value;
+  const km = document.querySelector('input[name="kling-mode"]:checked').value;
+  const prompts = document.getElementById('prompts-input').value;
+  const klingAccess = document.getElementById('kling-access').value;
+  const klingSecret = document.getElementById('kling-secret').value;
 
   document.getElementById('gen-idle').style.display = 'none';
   document.getElementById('gen-progress').style.display = 'block';
@@ -176,9 +143,14 @@ async function startGeneration() {
   const form = new FormData();
   form.append('session_id', sessionId);
   form.append('scripts', scripts);
+  form.append('prompts', prompts);
   form.append('video_count', vc);
   form.append('image_mode', im);
   form.append('script_mode', sm);
+  form.append('clip_duration', cd);
+  form.append('kling_mode', km);
+  form.append('kling_access_key', klingAccess);
+  form.append('kling_secret_key', klingSecret);
 
   try {
     const res = await fetch('/api/generate', { method: 'POST', body: form });
@@ -186,9 +158,7 @@ async function startGeneration() {
     if (data.error) { showError(data.error); return; }
     jobId = data.job_id;
     pollStatus(vc);
-  } catch (e) {
-    showError(String(e));
-  }
+  } catch (e) { showError(String(e)); }
 }
 
 function pollStatus(total) {
@@ -198,26 +168,20 @@ function pollStatus(total) {
       const res = await fetch(`/api/status/${jobId}`);
       const data = await res.json();
       updateProgress(data, total);
-      if (data.status === 'complete' || data.status === 'error') {
-        clearInterval(pollTimer);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  }, 2000);
+      if (data.status === 'complete' || data.status === 'error') clearInterval(pollTimer);
+    } catch (e) { console.error(e); }
+  }, 3000);
 }
 
 function updateProgress(data, total) {
   const done = data.progress || 0;
   const pct = Math.round((done / Math.max(total, 1)) * 100);
-
   document.getElementById('progress-fill').style.width = `${pct}%`;
   document.getElementById('progress-label').textContent =
     data.status === 'complete'
-      ? `Done! Generated ${data.videos.length} videos.`
+      ? `Done! Generated ${data.videos.length} video${data.videos.length !== 1 ? 's' : ''}.`
       : `Generating video ${done + 1} of ${total}...`;
 
-  // Render newly finished videos
   const list = document.getElementById('video-list');
   if (data.videos && data.videos.length > list.children.length) {
     for (let i = list.children.length; i < data.videos.length; i++) {
@@ -229,9 +193,7 @@ function updateProgress(data, total) {
           <div class="vi-name">${name}</div>
           <div class="vi-status">&#10003; Ready</div>
         </div>
-        <a class="btn" href="/api/download/${jobId}/${name}" download="${name}">
-          &#8595; Download
-        </a>
+        <a class="btn" href="/api/download/${jobId}/${name}" download="${name}">&#8595; Download</a>
       `;
       list.appendChild(item);
     }
@@ -240,22 +202,18 @@ function updateProgress(data, total) {
   if (data.status === 'complete') {
     document.getElementById('progress-fill').style.width = '100%';
     document.getElementById('gen-complete').style.display = 'flex';
-    document.getElementById('download-all-btn').onclick = () => {
-      window.location.href = `/api/download-all/${jobId}`;
-    };
+    document.getElementById('download-all-btn').onclick = () => { window.location.href = `/api/download-all/${jobId}`; };
   }
 
-  if (data.status === 'error') {
-    showError(data.error || 'Generation failed.');
-  }
+  if (data.status === 'error') showError(data.error || 'Generation failed.');
 }
 
 function showError(msg) {
   document.getElementById('gen-progress').style.display = 'none';
   document.getElementById('gen-idle').style.display = 'flex';
-  const summary = document.getElementById('gen-summary');
-  summary.style.color = '#f04';
-  summary.textContent = `Error: ${msg}`;
+  const s = document.getElementById('gen-summary');
+  s.style.color = '#f04';
+  s.textContent = `Error: ${msg}`;
 }
 
 function resetWizard() {
@@ -266,6 +224,7 @@ function resetWizard() {
   document.getElementById('img-counter').textContent = '0 / 20 images';
   document.getElementById('next-1').disabled = true;
   document.getElementById('scripts-input').value = '';
+  document.getElementById('prompts-input').value = '';
   document.getElementById('char-count').textContent = '0 characters';
   document.getElementById('video-count').value = 5;
   document.getElementById('vc-display').textContent = '5';
@@ -273,15 +232,8 @@ function resetWizard() {
   document.getElementById('gen-progress').style.display = 'none';
   document.getElementById('gen-complete').style.display = 'none';
   document.getElementById('video-list').innerHTML = '';
-
-  // Reset summary color
-  const summary = document.getElementById('gen-summary');
-  summary.style.color = '';
-
-  // New session
-  fetch('/api/session', { method: 'POST' })
-    .then(r => r.json())
-    .then(d => { sessionId = d.session_id; });
-
+  const s = document.getElementById('gen-summary');
+  s.style.color = '';
+  fetch('/api/session', { method: 'POST' }).then(r => r.json()).then(d => { sessionId = d.session_id; });
   goStep(1);
 }
