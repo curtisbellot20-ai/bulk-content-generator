@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bulk Content Generator</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <div class="logo">
+      <span class="logo-icon">&#9654;</span>
+      <span>Bulk Content Generator</span>
+    </div>
+    <p class="tagline">Turn your images &amp; scripts into short-form videos — in bulk.</p>
+  </header>
+
+  <div class="wizard">
+    <!-- Step indicators -->
+    <div class="steps">
+      <div class="step active" id="ind-1"><span class="num">1</span><span class="label">Images</span></div>
+      <div class="step" id="ind-2"><span class="num">2</span><span class="label">Scripts</span></div>
+      <div class="step" id="ind-3"><span class="num">3</span><span class="label">Settings</span></div>
+      <div class="step" id="ind-4"><span class="num">4</span><span class="label">Generate</span></div>
+    </div>
+
+    <!-- STEP 1: Images -->
+    <div class="panel active" id="panel-1">
+      <h2>Upload Your Images</h2>
+      <p class="hint">Upload 1–20 images of yourself (AI photos work great). Videos will use these images with a slow zoom effect.</p>
+      <div class="drop-zone" id="drop-zone">
+        <div class="drop-inner">
+          <div class="drop-icon">&#128247;</div>
+          <p>Drag &amp; drop images here<br/><span>or click to browse</span></p>
+          <input type="file" id="file-input" accept="image/*" multiple hidden />
+        </div>
+      </div>
+      <div class="image-grid" id="image-grid"></div>
+      <div class="counter" id="img-counter">0 / 20 images</div>
+      <div class="nav-row">
+        <button class="btn" id="next-1" disabled>Next: Scripts &rarr;</button>
+      </div>
+    </div>
+
+    <!-- STEP 2: Scripts -->
+    <div class="panel" id="panel-2">
+      <h2>Enter Your Scripts</h2>
+      <p class="hint">Each script becomes one video. Separate scripts with a line of <code>---</code>. Or paste one long piece and use Run-On mode to split it automatically.</p>
+      <div class="script-example">
+        <strong>Example format:</strong>
+        <pre>Hey everyone! Today I want to share my top tips for growing on social media...
+
+---
+
+Did you know consistency is the #1 factor for algorithm growth? Here's why...
+
+---
+
+Let me show you exactly how I schedule my content for maximum reach...</pre>
+      </div>
+      <textarea id="scripts-input" placeholder="Paste your scripts here. Separate each script with ---" rows="14"></textarea>
+      <div class="char-count" id="char-count">0 characters</div>
+      <div class="nav-row">
+        <button class="btn btn-outline" onclick="goStep(1)">&larr; Back</button>
+        <button class="btn" id="next-2" onclick="goStep(3)">Next: Settings &rarr;</button>
+      </div>
+    </div>
+
+    <!-- STEP 3: Settings -->
+    <div class="panel" id="panel-3">
+      <h2>Configure Your Batch</h2>
+
+      <div class="setting-group">
+        <label>Number of Videos: <strong id="vc-display">5</strong></label>
+        <input type="range" id="video-count" min="1" max="20" value="5" />
+        <div class="range-labels"><span>1</span><span>10</span><span>20</span></div>
+      </div>
+
+      <div class="setting-group">
+        <label>Image Selection</label>
+        <div class="radio-group">
+          <label class="radio-card active" id="rc-rotation">
+            <input type="radio" name="image-mode" value="rotation" checked />
+            <span class="rc-icon">&#128260;</span>
+            <span class="rc-title">Rotation</span>
+            <span class="rc-desc">Cycle through images in order</span>
+          </label>
+          <label class="radio-card" id="rc-random">
+            <input type="radio" name="image-mode" value="random" />
+            <span class="rc-icon">&#127922;</span>
+            <span class="rc-title">Random</span>
+            <span class="rc-desc">Pick a random image per video</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="setting-group">
+        <label>Script Mode</label>
+        <div class="radio-group">
+          <label class="radio-card active" id="rc-separate">
+            <input type="radio" name="script-mode" value="separate" checked />
+            <span class="rc-icon">&#128196;</span>
+            <span class="rc-title">Separate</span>
+            <span class="rc-desc">Each --- block is its own video</span>
+          </label>
+          <label class="radio-card" id="rc-runon">
+            <input type="radio" name="script-mode" value="runon" />
+            <span class="rc-icon">&#128279;</span>
+            <span class="rc-title">Run-On</span>
+            <span class="rc-desc">One long script split evenly across videos</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="nav-row">
+        <button class="btn btn-outline" onclick="goStep(2)">&larr; Back</button>
+        <button class="btn" onclick="goStep(4)">Generate Videos &rarr;</button>
+      </div>
+    </div>
+
+    <!-- STEP 4: Generate -->
+    <div class="panel" id="panel-4">
+      <h2>Generate &amp; Download</h2>
+      <div id="gen-idle">
+        <div class="summary" id="gen-summary"></div>
+        <button class="btn btn-large" id="gen-btn" onclick="startGeneration()">&#9654; Start Generating</button>
+        <button class="btn btn-outline" onclick="goStep(3)">&larr; Back to Settings</button>
+      </div>
+
+      <div id="gen-progress" style="display:none">
+        <div class="progress-label" id="progress-label">Generating video 0 of 0...</div>
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+        <p class="progress-hint">This may take a few minutes. Videos will appear below as they finish.</p>
+      </div>
+
+      <div id="video-list"></div>
+
+      <div id="gen-complete" style="display:none">
+        <div class="complete-banner">&#10003; All videos generated!</div>
+        <button class="btn btn-large" id="download-all-btn">&#8595; Download All (ZIP)</button>
+        <button class="btn btn-outline" onclick="resetWizard()">&#43; New Batch</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
