@@ -7,8 +7,6 @@ from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, File, Form, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from starlette.requests import Request
 
 load_dotenv()
 
@@ -20,15 +18,14 @@ for _d in [UPLOAD_DIR, OUTPUT_DIR, Path("static"), Path("templates")]:
     _d.mkdir(exist_ok=True)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
 
 jobs: dict = {}
 ALLOWED_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 
 
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+async def index():
+    return HTMLResponse(content=Path("templates/index.html").read_text())
 
 
 @app.post("/api/session")
@@ -72,7 +69,6 @@ async def generate_scripts(
     count: int = Form(default=5),
     anthropic_key: str = Form(default=""),
 ):
-    """Generate scripts + Kling motion prompts via Claude and return them."""
     api_key = anthropic_key.strip() or os.getenv("ANTHROPIC_API_KEY", "")
     if not api_key:
         return JSONResponse(
@@ -117,7 +113,6 @@ async def generate_videos(
     if not scripts.strip():
         return JSONResponse({"error": "No scripts provided"}, status_code=400)
 
-    # PiAPI key takes priority over direct Kling keys
     piapi_key_val = piapi_key.strip() or os.getenv("PIAPI_KEY", "")
     access_key = kling_access_key.strip() or os.getenv("KLING_ACCESS_KEY", "")
     secret_key = kling_secret_key.strip() or os.getenv("KLING_SECRET_KEY", "")
