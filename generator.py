@@ -105,7 +105,6 @@ def _extract_json(text: str) -> list:
 
 def generate_scripts_and_prompts(description: str, count: int, api_key: str) -> list:
     import anthropic
-
     client = anthropic.Anthropic(api_key=api_key)
     user_msg = (
         f"Content style: {description}\n"
@@ -131,7 +130,7 @@ def generate_scripts_and_prompts(description: str, count: int, api_key: str) -> 
 
 
 # ---------------------------------------------------------------------------
-# Kling AI direct client (JWT auth)
+# Kling AI direct client (JWT auth) — img2video + lip-sync
 # ---------------------------------------------------------------------------
 
 class KlingClient:
@@ -149,6 +148,52 @@ class KlingClient:
 
     def _headers(self) -> dict:
         return {"Authorization": f"Bearer {self._jwt()}", "Content-Type": "application/json"}
+
+    def submit_lip_sync(self, image_path: str, audio_path: str, mode: str = "std") -> str:
+        with open(image_path, "rb") as f:
+            img_b64 = base64.b64encode(f.read()).decode()
+        with open(audio_path, "rb") as f:
+            audio_b64 = base64.b64encode(f.read()).decode()
+        resp = _requests.post(
+            f"{self.BASE_URL}/v1/videos/lip-sync",
+            headers=self._headers(),
+            json={
+                "model_name": "kling-v1",
+                "input": {
+                    "image": img_b64,
+                    "audio_type": "file",
+                    "audio_file": audio_b64,
+                },
+                "mode": mode,
+                "aspect_ratio": "9:16",
+            },
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("code") != 0:
+            raise RuntimeError(f"Kling lip-sync submit error: {data.get('message')}")
+        return data["data"]["task_id"]
+
+    def poll_lip_sync(self, task_id: str, timeout: int = 420) -> str:
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            resp = _requests.get(
+                f"{self.BASE_URL}/v1/videos/lip-sync/{task_id}",
+                headers=self._headers(),
+                timeout=30,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            if data.get("code") != 0:
+                raise RuntimeError(f"Kling lip-sync poll error: {data.get('message')}")
+            status = data["data"]["task_status"]
+            if status == "succeed":
+                return data["data"]["task_result"]["videos"][0]["url"]
+            if status in ("failed", "expired"):
+                raise RuntimeError(f"Kling lip-sync task {status}: {data['data'].get('task_status_msg', '')}")
+            time.sleep(8)
+        raise TimeoutError(f"Kling lip-sync task {task_id} timed out")
 
     def submit_image2video(self, image_path: str, prompt: str, duration: str = "5", mode: str = "std") -> str:
         with open(image_path, "rb") as f:
@@ -196,7 +241,7 @@ class KlingClient:
 
 
 # ---------------------------------------------------------------------------
-# PiAPI Kling client (X-API-KEY auth)
+# PiAPI Kling client (X-API-KEY auth) — img2video + lip-sync
 # ---------------------------------------------------------------------------
 
 class PiAPIKlingClient:
@@ -208,6 +253,52 @@ class PiAPIKlingClient:
 
     def _headers(self) -> dict:
         return {"X-API-KEY": self.api_key, "Content-Type": "application/json"}
+
+    def submit_lip_sync(self, image_path: str, audio_path: str, mode: str = "std") -> str:
+        with open(image_path, "rb") as f:
+            img_b64 = base64.b64encode(f.read()).decode()
+        with open(audio_path, "rb") as f:
+            audio_b64 = base64.b64encode(f.read()).decode()
+        resp = _requests.post(
+            f"{self.BASE_URL}/api/kling/v1/videos/lip-sync",
+            headers=self._headers(),
+            json={
+                "model_name": "kling-v1",
+                "input": {
+                    "image": img_b64,
+                    "audio_type": "file",
+                    "audio_file": audio_b64,
+                },
+                "mode": mode,
+                "aspect_ratio": "9:16",
+            },
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("code") != 200:
+            raise RuntimeError(f"PiAPI lip-sync submit error: {data.get('message')}")
+        return data["data"]["task_id"]
+
+    def poll_lip_sync(self, task_id: str, timeout: int = 420) -> str:
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            resp = _requests.get(
+                f"{self.BASE_URL}/api/kling/v1/videos/lip-sync/{task_id}",
+                headers=self._headers(),
+                timeout=30,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            if data.get("code") != 200:
+                raise RuntimeError(f"PiAPI lip-sync poll error: {data.get('message')}")
+            status = data["data"]["task_status"]
+            if status == "succeed":
+                return data["data"]["task_result"]["videos"][0]["url"]
+            if status in ("failed", "expired"):
+                raise RuntimeError(f"PiAPI lip-sync task {status}: {data['data'].get('task_status_msg', '')}")
+            time.sleep(8)
+        raise TimeoutError(f"PiAPI lip-sync task {task_id} timed out")
 
     def submit_image2video(self, image_path: str, prompt: str, duration: str = "5", mode: str = "std") -> str:
         with open(image_path, "rb") as f:
@@ -264,13 +355,14 @@ class VideoGenerator:
 
     def __init__(self, image_paths: List[str], image_mode: str = "rotation",
                  kling_client=None, clip_duration: str = "5",
-                 kling_mode: str = "std"):
+                 kling_mode: str = "std", use_lip_sync: bool = True):
         self.image_paths = image_paths
         self.image_mode = image_mode
         self._index = 0
         self.kling = kling_client
         self.clip_duration = clip_duration
         self.kling_mode = kling_mode
+        self.use_lip_sync = use_lip_sync
 
     def _next_image(self) -> str:
         if self.image_mode == "random":
@@ -310,6 +402,26 @@ class VideoGenerator:
             idx = min(int(t / chunk_dur), len(chunks) - 1)
             return _draw_text_overlay(frame, chunks[idx], tw, th) if chunks else frame
         return clip.fl(add_captions)
+
+    def _create_lip_sync_video(self, script: str, img_path: str, output_path: str):
+        """Generate TTS audio then use Kling lip-sync to produce a talking head video."""
+        from moviepy.editor import AudioFileClip, VideoFileClip
+        with tempfile.TemporaryDirectory() as tmp:
+            audio_path = os.path.join(tmp, "speech.mp3")
+            if not self._tts(script, audio_path):
+                raise RuntimeError("TTS failed — cannot generate lip-sync without audio")
+            task_id = self.kling.submit_lip_sync(img_path, audio_path, mode=self.kling_mode)
+            video_url = self.kling.poll_lip_sync(task_id)
+            video_bytes = _requests.get(video_url, timeout=120).content
+            raw_path = os.path.join(tmp, "lipsync_raw.mp4")
+            with open(raw_path, "wb") as f:
+                f.write(video_bytes)
+            tw, th = self.TARGET_W, self.TARGET_H
+            clip = VideoFileClip(raw_path).resize((tw, th))
+            clip = self._caption_clip(clip, script)
+            clip.write_videofile(output_path, fps=30, codec="libx264", audio_codec="aac",
+                                 temp_audiofile=os.path.join(tmp, "tmp_audio.m4a"),
+                                 remove_temp=True, logger=None, threads=4, preset="medium")
 
     def _create_kling_video(self, script: str, prompt: str, img_path: str, output_path: str):
         from moviepy.editor import AudioFileClip, VideoFileClip
@@ -368,11 +480,18 @@ class VideoGenerator:
     def create_video(self, script: str, prompt: str, output_path: str, video_index: int = 0):
         img_path = self._next_image()
         if self.kling:
+            # Try lip-sync first (talking head), fall back to img2video, then static
+            if self.use_lip_sync:
+                try:
+                    self._create_lip_sync_video(script, img_path, output_path)
+                    return
+                except Exception as exc:
+                    print(f"[Kling lip-sync] video {video_index+1} failed ({exc}) — trying img2video")
             try:
                 self._create_kling_video(script, prompt, img_path, output_path)
                 return
             except Exception as exc:
-                print(f"[Kling] video {video_index+1} failed ({exc}) — using static fallback")
+                print(f"[Kling img2video] video {video_index+1} failed ({exc}) — using static fallback")
         self._create_static_video(script, img_path, output_path)
 
 
