@@ -3,7 +3,7 @@ let sessionId = null;
 let uploadedImages = [];
 let jobId = null;
 let pollTimer = null;
-let aiItems = [];       // [{script, prompt}, ...] from Claude
+let aiItems = [];
 
 /* ---- Init ---- */
 document.addEventListener('DOMContentLoaded', async () => {
@@ -17,31 +17,27 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 });
 
-/* ---- Load .env key status and show in UI ---- */
+/* ---- Show .env / env-var key status in Step 3 ---- */
 async function loadConfigStatus() {
   try {
     const data = await (await fetch('/api/config-status')).json();
     const banner = document.getElementById('kling-status-banner');
     if (data.kling_ready) {
-      let detail = '';
-      if (data.piapi_key) detail = 'PiAPI key loaded';
-      else if (data.kling_access_key && data.kling_secret_key) detail = 'Kling access + secret keys loaded';
-      banner.innerHTML = `<div class="key-status ok"><span class="dot"></span>&#10003; Kling API ready — ${detail} from .env. No need to enter keys below.</div>`;
-      // Auto-select the right provider
-      if (data.piapi_key && !data.kling_access_key) {
-        document.querySelector('input[name="kling-provider"][value="piapi"]').checked = true;
-        document.getElementById('rc-piapi').classList.add('active');
-        document.getElementById('rc-direct').classList.remove('active');
-        toggleKlingProvider();
-      }
+      let detail = data.piapi_key ? 'PiAPI key' : 'Kling access + secret keys';
+      banner.innerHTML = `<div class="key-status ok"><span class="dot"></span>&#10003; Kling API ready — ${detail} loaded from environment. Lip-sync enabled.</div>`;
     } else {
-      banner.innerHTML = `<div class="key-status missing"><span class="dot"></span>&#9888; No Kling keys found in .env — videos will be static with voiceover. See setup instructions below.</div>`;
-    }
-    // Anthropic key badge
-    if (data.anthropic_key) {
-      document.getElementById('anthropic-badge').textContent = '✓ loaded from .env';
-      document.getElementById('anthropic-badge').style.background = '#d1fae5';
-      document.getElementById('anthropic-badge').style.color = '#065f46';
+      banner.innerHTML = `<div class="key-status missing"><span class="dot"></span>
+        &#9888; No Kling keys detected. Videos will be static with voiceover.<br/>
+        <span style="font-weight:normal;font-size:12px;margin-top:4px;display:block">
+          Stop the server, run these exports, then restart uvicorn:<br/>
+          <code style="background:#1e293b;color:#7dd3fc;padding:6px 10px;border-radius:4px;display:inline-block;margin-top:4px;font-family:monospace;font-size:11px">
+export KLING_ACCESS_KEY=your_access_key<br/>
+export KLING_SECRET_KEY=your_secret_key<br/>
+export ANTHROPIC_API_KEY=your_claude_key<br/>
+uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+          </code>
+        </span>
+      </div>`;
     }
   } catch(e) { console.error('config-status error', e); }
 }
@@ -119,13 +115,6 @@ function setupRadioCards() {
   });
 }
 
-/* ---- Kling provider toggle ---- */
-function toggleKlingProvider() {
-  const isPiAPI = document.querySelector('input[name="kling-provider"]:checked').value === 'piapi';
-  document.getElementById('piapi-key-section').style.display = isPiAPI ? 'block' : 'none';
-  document.getElementById('direct-key-section').style.display = isPiAPI ? 'none' : 'block';
-}
-
 /* ---- Navigation ---- */
 document.getElementById('next-1').addEventListener('click', () => goStep(2));
 
@@ -143,35 +132,27 @@ function goStep(n) {
 async function aiGenerate() {
   const desc = document.getElementById('ai-description').value.trim();
   if (!desc) { alert('Please describe the type of content you want.'); return; }
-
   const count = parseInt(document.getElementById('ai-count').value);
-  const anthropicKey = document.getElementById('anthropic-key').value.trim();
-
   const btn = document.getElementById('ai-generate-btn');
   const status = document.getElementById('ai-status');
-  const preview = document.getElementById('ai-preview');
-  const generateRow = document.getElementById('ai-generate-row');
-
   btn.disabled = true;
   btn.textContent = '⏳ Writing scripts...';
   status.className = 'loading';
   status.textContent = `Claude is writing ${count} scripts for "${desc}"...`;
   status.style.display = 'block';
-  preview.style.display = 'none';
+  document.getElementById('ai-preview').style.display = 'none';
 
   const form = new FormData();
   form.append('description', desc);
   form.append('count', count);
-  form.append('anthropic_key', anthropicKey);
 
   try {
     const res = await fetch('/api/generate-scripts', { method: 'POST', body: form });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
-
     aiItems = data.items;
     status.style.display = 'none';
-    generateRow.style.display = 'none';
+    document.getElementById('ai-generate-row').style.display = 'none';
     showPreview(aiItems);
   } catch (err) {
     status.className = 'error';
@@ -184,7 +165,6 @@ async function aiGenerate() {
 function showPreview(items) {
   const preview = document.getElementById('ai-preview');
   const cards = document.getElementById('preview-cards');
-
   cards.innerHTML = '';
   items.forEach((item, i) => {
     const d = document.createElement('div');
@@ -196,7 +176,6 @@ function showPreview(items) {
     `;
     cards.appendChild(d);
   });
-
   preview.style.display = 'block';
 }
 
@@ -216,7 +195,7 @@ function proceedToSettings() {
   goStep(3);
 }
 
-/* ---- Manual submit (from Step 3) ---- */
+/* ---- Manual submit (Step 3 → Step 4) ---- */
 async function submitManualGeneration() {
   const scripts = document.getElementById('scripts-input').value.trim();
   if (!scripts) { alert('Please enter at least one script.'); return; }
@@ -227,16 +206,11 @@ async function submitManualGeneration() {
   await submitGeneration(scripts, prompts, count, sm);
 }
 
-/* ---- Core generation call ---- */
+/* ---- Core generation call — no API keys sent, backend reads from env ---- */
 async function submitGeneration(scripts, prompts, videoCount, scriptMode) {
   const im = document.querySelector('input[name="image-mode"]:checked').value;
   const cd = document.querySelector('input[name="clip-duration"]:checked').value;
   const km = document.querySelector('input[name="kling-mode"]:checked').value;
-  const provider = document.querySelector('input[name="kling-provider"]:checked').value;
-  // Always send both; backend picks whichever is non-empty (UI fields override .env)
-  const piapiKey = document.getElementById('piapi-key').value.trim();
-  const klingAccess = document.getElementById('kling-access').value.trim();
-  const klingSecret = document.getElementById('kling-secret').value.trim();
 
   resetProgressUI(videoCount);
 
@@ -249,9 +223,6 @@ async function submitGeneration(scripts, prompts, videoCount, scriptMode) {
   form.append('script_mode', scriptMode);
   form.append('clip_duration', cd);
   form.append('kling_mode', km);
-  form.append('piapi_key', piapiKey);
-  form.append('kling_access_key', klingAccess);
-  form.append('kling_secret_key', klingSecret);
 
   try {
     const data = await (await fetch('/api/generate', { method: 'POST', body: form })).json();

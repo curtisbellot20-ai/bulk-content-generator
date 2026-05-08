@@ -6,12 +6,14 @@
   <title>Bulk Content Generator</title>
   <link rel="stylesheet" href="/static/style.css" />
   <style>
-    .key-status { display:inline-flex; align-items:center; gap:6px; font-size:13px; padding:6px 12px; border-radius:8px; margin-bottom:12px; }
+    .key-status { display:inline-flex; align-items:center; gap:8px; font-size:13px; padding:8px 14px; border-radius:8px; margin-bottom:12px; font-weight:500; }
     .key-status.ok { background:#d1fae5; color:#065f46; }
     .key-status.missing { background:#fee2e2; color:#991b1b; }
-    .key-status .dot { width:8px; height:8px; border-radius:50%; }
+    .key-status .dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
     .key-status.ok .dot { background:#10b981; }
     .key-status.missing .dot { background:#ef4444; }
+    .env-instructions { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:16px; margin-bottom:16px; font-size:13px; }
+    .env-instructions code { background:#1e293b; color:#7dd3fc; padding:10px 14px; border-radius:6px; display:block; margin-top:8px; font-family:monospace; font-size:12px; white-space:pre; line-height:1.7; }
   </style>
 </head>
 <body>
@@ -31,7 +33,7 @@
     <!-- STEP 1: Images -->
     <div class="panel active" id="panel-1">
       <h2>Upload Your Images</h2>
-      <p class="hint">Upload 1&ndash;20 AI images or photos of yourself. Kling will animate each one based on the motion prompts generated in the next step.</p>
+      <p class="hint">Upload 1&ndash;20 AI images or photos of yourself. Kling will animate each one with lip-sync audio.</p>
       <div class="drop-zone" id="drop-zone">
         <div class="drop-inner">
           <div class="drop-icon">&#128247;</div>
@@ -64,20 +66,14 @@
           <textarea id="ai-description" rows="3" placeholder="e.g. anime rage bait&#10;e.g. motivational gym content&#10;e.g. dark humor lifestyle commentary"></textarea>
         </div>
 
-        <div class="two-col">
-          <div class="field-group">
-            <label class="field-label">Number of Videos</label>
-            <div class="count-row">
-              <button class="count-btn" onclick="adjustCount(-1)">&#8722;</button>
-              <span id="ai-count-display">5</span>
-              <button class="count-btn" onclick="adjustCount(1)">&#43;</button>
-            </div>
-            <input type="hidden" id="ai-count" value="5" />
+        <div class="field-group">
+          <label class="field-label">Number of Videos</label>
+          <div class="count-row">
+            <button class="count-btn" onclick="adjustCount(-1)">&#8722;</button>
+            <span id="ai-count-display">5</span>
+            <button class="count-btn" onclick="adjustCount(1)">&#43;</button>
           </div>
-          <div class="field-group">
-            <label class="field-label">Claude API Key <span class="badge" id="anthropic-badge">optional if in .env</span></label>
-            <input type="password" id="anthropic-key" placeholder="sk-ant-... (leave blank if set in .env)" autocomplete="off" />
-          </div>
+          <input type="hidden" id="ai-count" value="5" />
         </div>
 
         <div id="ai-status" style="display:none"></div>
@@ -134,6 +130,9 @@ Stop trying to go viral. Seriously. Here's what actually grows your account...</
     <div class="panel" id="panel-3">
       <h2>Settings</h2>
 
+      <!-- API Key status -->
+      <div id="kling-status-banner" style="margin-bottom:16px"></div>
+
       <div class="setting-group">
         <label>Image Selection</label>
         <div class="radio-group">
@@ -169,51 +168,10 @@ Stop trying to go viral. Seriously. Here's what actually grows your account...</
       <div class="kling-card">
         <div class="kling-header">
           <span class="kling-logo">&#127916;</span>
-          <div><strong>Kling AI</strong><span class="badge badge-purple">Animation Engine</span></div>
+          <div><strong>Kling AI</strong><span class="badge badge-purple">Lip-Sync Engine</span></div>
         </div>
 
-        <!-- Live key status from .env -->
-        <div id="kling-status-banner" style="margin-bottom:12px"></div>
-
-        <p class="hint" style="margin-bottom:16px">Leave the fields below blank &mdash; keys load automatically from <code>.env</code>. Only fill in to override.</p>
-
-        <div class="setting-group" style="margin-bottom:0">
-          <label>API Provider</label>
-          <div class="radio-group">
-            <label class="radio-card" id="rc-piapi">
-              <input type="radio" name="kling-provider" value="piapi" onchange="toggleKlingProvider()" />
-              <span class="rc-icon">&#9889;</span><span class="rc-title">PiAPI</span>
-              <span class="rc-desc">Single key &mdash; piapi.ai</span>
-            </label>
-            <label class="radio-card active" id="rc-direct">
-              <input type="radio" name="kling-provider" value="direct" checked onchange="toggleKlingProvider()" />
-              <span class="rc-icon">&#128273;</span><span class="rc-title">Direct Kling</span>
-              <span class="rc-desc">Access + Secret key pair</span>
-            </label>
-          </div>
-        </div>
-
-        <!-- PiAPI key field -->
-        <div id="piapi-key-section" class="key-row" style="margin-top:16px;display:none">
-          <div class="field-group" style="flex:1">
-            <label class="field-label">PiAPI Key <span class="badge">leave blank if set in .env</span></label>
-            <input type="password" id="piapi-key" placeholder="Leave blank — loads from .env automatically" autocomplete="off" />
-          </div>
-        </div>
-
-        <!-- Direct Kling key fields -->
-        <div id="direct-key-section" class="key-row" style="margin-top:16px">
-          <div class="field-group">
-            <label class="field-label">Access Key <span class="badge">leave blank if set in .env</span></label>
-            <input type="password" id="kling-access" placeholder="Leave blank — loads from .env" autocomplete="off" />
-          </div>
-          <div class="field-group">
-            <label class="field-label">Secret Key <span class="badge">leave blank if set in .env</span></label>
-            <input type="password" id="kling-secret" placeholder="Leave blank — loads from .env" autocomplete="off" />
-          </div>
-        </div>
-
-        <div class="setting-group" style="margin-top:20px;margin-bottom:0">
+        <div class="setting-group" style="margin-bottom:0;margin-top:8px">
           <label>Clip Duration</label>
           <div class="radio-group">
             <label class="radio-card active" id="rc-5s">
