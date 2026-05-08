@@ -11,10 +11,40 @@ document.addEventListener('DOMContentLoaded', async () => {
   sessionId = (await res.json()).session_id;
   setupDropZone();
   setupRadioCards();
+  loadConfigStatus();
   document.getElementById('scripts-input').addEventListener('input', e => {
     document.getElementById('char-count').textContent = `${e.target.value.length} characters`;
   });
 });
+
+/* ---- Load .env key status and show in UI ---- */
+async function loadConfigStatus() {
+  try {
+    const data = await (await fetch('/api/config-status')).json();
+    const banner = document.getElementById('kling-status-banner');
+    if (data.kling_ready) {
+      let detail = '';
+      if (data.piapi_key) detail = 'PiAPI key loaded';
+      else if (data.kling_access_key && data.kling_secret_key) detail = 'Kling access + secret keys loaded';
+      banner.innerHTML = `<div class="key-status ok"><span class="dot"></span>&#10003; Kling API ready — ${detail} from .env. No need to enter keys below.</div>`;
+      // Auto-select the right provider
+      if (data.piapi_key && !data.kling_access_key) {
+        document.querySelector('input[name="kling-provider"][value="piapi"]').checked = true;
+        document.getElementById('rc-piapi').classList.add('active');
+        document.getElementById('rc-direct').classList.remove('active');
+        toggleKlingProvider();
+      }
+    } else {
+      banner.innerHTML = `<div class="key-status missing"><span class="dot"></span>&#9888; No Kling keys found in .env — videos will be static with voiceover. See setup instructions below.</div>`;
+    }
+    // Anthropic key badge
+    if (data.anthropic_key) {
+      document.getElementById('anthropic-badge').textContent = '✓ loaded from .env';
+      document.getElementById('anthropic-badge').style.background = '#d1fae5';
+      document.getElementById('anthropic-badge').style.color = '#065f46';
+    }
+  } catch(e) { console.error('config-status error', e); }
+}
 
 /* ---- Drop zone ---- */
 function setupDropZone() {
@@ -171,7 +201,6 @@ function showPreview(items) {
 }
 
 function cancelAutolaunch() {
-  // Copy generated content into manual fields and switch to manual tab
   document.getElementById('scripts-input').value = aiItems.map(i => i.script).join('\n\n---\n\n');
   document.getElementById('prompts-input').value = aiItems.map(i => i.prompt).join('\n');
   switchTab('manual');
@@ -182,7 +211,6 @@ function cancelAutolaunch() {
 }
 
 function proceedToSettings() {
-  // Copy AI scripts into manual fields so Step 3 → submitManualGeneration works
   document.getElementById('scripts-input').value = aiItems.map(i => i.script).join('\n\n---\n\n');
   document.getElementById('prompts-input').value = aiItems.map(i => i.prompt).join('\n');
   goStep(3);
@@ -205,9 +233,10 @@ async function submitGeneration(scripts, prompts, videoCount, scriptMode) {
   const cd = document.querySelector('input[name="clip-duration"]:checked').value;
   const km = document.querySelector('input[name="kling-mode"]:checked').value;
   const provider = document.querySelector('input[name="kling-provider"]:checked').value;
-  const piapiKey = provider === 'piapi' ? document.getElementById('piapi-key').value : '';
-  const klingAccess = provider === 'direct' ? document.getElementById('kling-access').value : '';
-  const klingSecret = provider === 'direct' ? document.getElementById('kling-secret').value : '';
+  // Always send both; backend picks whichever is non-empty (UI fields override .env)
+  const piapiKey = document.getElementById('piapi-key').value.trim();
+  const klingAccess = document.getElementById('kling-access').value.trim();
+  const klingSecret = document.getElementById('kling-secret').value.trim();
 
   resetProgressUI(videoCount);
 
@@ -259,7 +288,7 @@ function updateProgress(data, total) {
   document.getElementById('progress-label').textContent =
     data.status === 'complete'
       ? `Done! ${data.videos.length} video${data.videos.length !== 1 ? 's' : ''} ready.`
-      : `Animating video ${done + 1} of ${total} with Kling...`;
+      : `Generating video ${done + 1} of ${total}...`;
 
   const list = document.getElementById('video-list');
   if (data.videos) {

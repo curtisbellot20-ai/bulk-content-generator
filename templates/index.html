@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bulk Content Generator</title>
   <link rel="stylesheet" href="/static/style.css" />
+  <style>
+    .key-status { display:inline-flex; align-items:center; gap:6px; font-size:13px; padding:6px 12px; border-radius:8px; margin-bottom:12px; }
+    .key-status.ok { background:#d1fae5; color:#065f46; }
+    .key-status.missing { background:#fee2e2; color:#991b1b; }
+    .key-status .dot { width:8px; height:8px; border-radius:50%; }
+    .key-status.ok .dot { background:#10b981; }
+    .key-status.missing .dot { background:#ef4444; }
+  </style>
 </head>
 <body>
   <header>
@@ -42,7 +50,6 @@
     <div class="panel" id="panel-2">
       <h2>Scripts &amp; Prompts</h2>
 
-      <!-- Tab switcher -->
       <div class="tab-bar">
         <button class="tab active" id="tab-ai" onclick="switchTab('ai')">&#9889; AI Generate</button>
         <button class="tab" id="tab-manual" onclick="switchTab('manual')">&#9998; Manual Entry</button>
@@ -68,14 +75,13 @@
             <input type="hidden" id="ai-count" value="5" />
           </div>
           <div class="field-group">
-            <label class="field-label">Claude API Key <span class="badge">optional if in .env</span></label>
-            <input type="password" id="anthropic-key" placeholder="sk-ant-..." autocomplete="off" />
+            <label class="field-label">Claude API Key <span class="badge" id="anthropic-badge">optional if in .env</span></label>
+            <input type="password" id="anthropic-key" placeholder="sk-ant-... (leave blank if set in .env)" autocomplete="off" />
           </div>
         </div>
 
         <div id="ai-status" style="display:none"></div>
 
-        <!-- Generated preview -->
         <div id="ai-preview" style="display:none">
           <div class="preview-header">
             <span>&#10003; Scripts ready &mdash; click below to configure settings &amp; launch</span>
@@ -165,18 +171,22 @@ Stop trying to go viral. Seriously. Here's what actually grows your account...</
           <span class="kling-logo">&#127916;</span>
           <div><strong>Kling AI</strong><span class="badge badge-purple">Animation Engine</span></div>
         </div>
-        <p class="hint" style="margin-bottom:16px">Keys in <code>.env</code> load automatically. No keys = Ken Burns static fallback.</p>
+
+        <!-- Live key status from .env -->
+        <div id="kling-status-banner" style="margin-bottom:12px"></div>
+
+        <p class="hint" style="margin-bottom:16px">Leave the fields below blank &mdash; keys load automatically from <code>.env</code>. Only fill in to override.</p>
 
         <div class="setting-group" style="margin-bottom:0">
           <label>API Provider</label>
           <div class="radio-group">
-            <label class="radio-card active" id="rc-piapi">
-              <input type="radio" name="kling-provider" value="piapi" checked onchange="toggleKlingProvider()" />
+            <label class="radio-card" id="rc-piapi">
+              <input type="radio" name="kling-provider" value="piapi" onchange="toggleKlingProvider()" />
               <span class="rc-icon">&#9889;</span><span class="rc-title">PiAPI</span>
-              <span class="rc-desc">Single key &mdash; recommended</span>
+              <span class="rc-desc">Single key &mdash; piapi.ai</span>
             </label>
-            <label class="radio-card" id="rc-direct">
-              <input type="radio" name="kling-provider" value="direct" onchange="toggleKlingProvider()" />
+            <label class="radio-card active" id="rc-direct">
+              <input type="radio" name="kling-provider" value="direct" checked onchange="toggleKlingProvider()" />
               <span class="rc-icon">&#128273;</span><span class="rc-title">Direct Kling</span>
               <span class="rc-desc">Access + Secret key pair</span>
             </label>
@@ -184,22 +194,22 @@ Stop trying to go viral. Seriously. Here's what actually grows your account...</
         </div>
 
         <!-- PiAPI key field -->
-        <div id="piapi-key-section" class="key-row" style="margin-top:16px">
+        <div id="piapi-key-section" class="key-row" style="margin-top:16px;display:none">
           <div class="field-group" style="flex:1">
-            <label class="field-label">PiAPI Key <span class="badge">from piapi.ai</span></label>
-            <input type="password" id="piapi-key" placeholder="From .env or enter here" autocomplete="off" />
+            <label class="field-label">PiAPI Key <span class="badge">leave blank if set in .env</span></label>
+            <input type="password" id="piapi-key" placeholder="Leave blank — loads from .env automatically" autocomplete="off" />
           </div>
         </div>
 
         <!-- Direct Kling key fields -->
-        <div id="direct-key-section" class="key-row" style="margin-top:16px;display:none">
+        <div id="direct-key-section" class="key-row" style="margin-top:16px">
           <div class="field-group">
-            <label class="field-label">Access Key</label>
-            <input type="password" id="kling-access" placeholder="From .env or enter here" autocomplete="off" />
+            <label class="field-label">Access Key <span class="badge">leave blank if set in .env</span></label>
+            <input type="password" id="kling-access" placeholder="Leave blank — loads from .env" autocomplete="off" />
           </div>
           <div class="field-group">
-            <label class="field-label">Secret Key</label>
-            <input type="password" id="kling-secret" placeholder="From .env or enter here" autocomplete="off" />
+            <label class="field-label">Secret Key <span class="badge">leave blank if set in .env</span></label>
+            <input type="password" id="kling-secret" placeholder="Leave blank — loads from .env" autocomplete="off" />
           </div>
         </div>
 
@@ -247,7 +257,7 @@ Stop trying to go viral. Seriously. Here's what actually grows your account...</
       <div id="gen-progress">
         <div class="progress-label" id="progress-label">Starting...</div>
         <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
-        <p class="progress-hint">Kling generation takes 1&ndash;3 min per video. Videos appear below as they finish.</p>
+        <p class="progress-hint">Kling lip-sync takes 1&ndash;3 min per video. Videos appear below as they finish.</p>
       </div>
 
       <div id="video-list"></div>

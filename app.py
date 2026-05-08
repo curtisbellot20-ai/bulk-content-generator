@@ -28,6 +28,22 @@ async def index():
     return HTMLResponse(content=Path("templates/index.html").read_text())
 
 
+@app.get("/api/config-status")
+async def config_status():
+    """Tell the UI which API keys are already loaded from .env."""
+    piapi = bool(os.getenv("PIAPI_KEY", "").strip())
+    access = bool(os.getenv("KLING_ACCESS_KEY", "").strip())
+    secret = bool(os.getenv("KLING_SECRET_KEY", "").strip())
+    anthropic = bool(os.getenv("ANTHROPIC_API_KEY", "").strip())
+    return {
+        "piapi_key": piapi,
+        "kling_access_key": access,
+        "kling_secret_key": secret,
+        "anthropic_key": anthropic,
+        "kling_ready": piapi or (access and secret),
+    }
+
+
 @app.post("/api/session")
 async def create_session():
     sid = str(uuid.uuid4())
@@ -59,10 +75,6 @@ async def delete_image(session_id: str, filename: str):
     return {"ok": True}
 
 
-# ---------------------------------------------------------------------------
-# AI script generation
-# ---------------------------------------------------------------------------
-
 @app.post("/api/generate-scripts")
 async def generate_scripts(
     description: str = Form(...),
@@ -83,10 +95,6 @@ async def generate_scripts(
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=500)
 
-
-# ---------------------------------------------------------------------------
-# Video generation
-# ---------------------------------------------------------------------------
 
 @app.post("/api/generate")
 async def generate_videos(
@@ -118,7 +126,6 @@ async def generate_videos(
     secret_key = kling_secret_key.strip() or os.getenv("KLING_SECRET_KEY", "")
     using_kling = bool(piapi_key_val or (access_key and secret_key))
 
-    # Diagnostic: show what keys are loaded
     print(f"[CONFIG] PIAPI key: {'SET' if piapi_key_val else 'NOT SET'}")
     print(f"[CONFIG] Kling access key: {'SET (' + access_key[:6] + '...)' if access_key else 'NOT SET'}")
     print(f"[CONFIG] Kling secret key: {'SET' if secret_key else 'NOT SET'}")
@@ -170,7 +177,7 @@ def _run_generation(job_id, image_paths, scripts_text, prompts_text, video_count
         for i, (script, prompt) in enumerate(zip(scripts[:video_count], prompt_list)):
             jobs[job_id]["progress"] = i
             out = str(output_dir / f"video_{i+1:02d}.mp4")
-            print(f"[VIDEO {i+1}] Starting — script: {script[:60]}...")
+            print(f"[VIDEO {i+1}] Starting — script: {script[:60]}")
             gen.create_video(script, prompt, out, video_index=i)
             print(f"[VIDEO {i+1}] Done -> {out}")
             done.append(f"video_{i+1:02d}.mp4")
