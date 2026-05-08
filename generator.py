@@ -12,6 +12,10 @@ import numpy as np
 import requests as _requests
 from PIL import Image, ImageDraw, ImageFont
 
+# moviepy 1.0.3 uses PIL.Image.ANTIALIAS which was removed in Pillow 10+
+if not hasattr(Image, 'ANTIALIAS'):
+    Image.ANTIALIAS = Image.LANCZOS
+
 _FONT_CANDIDATES = [
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
     "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
@@ -59,6 +63,15 @@ def _draw_text_overlay(frame: np.ndarray, text: str, tw: int, th: int) -> np.nda
             draw.text((x+dx, y+dy), line, font=font, fill=(0,0,0,255))
         draw.text((x, y), line, font=font, fill=(255,255,255,255))
     return np.array(img.convert("RGB"))
+
+
+def _resize_clip(clip, tw: int, th: int):
+    """Resize a moviepy clip using PIL LANCZOS to avoid ANTIALIAS dependency."""
+    if clip.size == (tw, th):
+        return clip
+    return clip.fl_image(lambda frame: np.array(
+        Image.fromarray(frame).resize((tw, th), Image.LANCZOS)
+    ))
 
 
 def extract_visual_prompt(script: str) -> str:
@@ -437,13 +450,14 @@ class VideoGenerator:
             task_id = self.kling.submit_lip_sync(img_path, audio_path, mode=self.kling_mode)
             print(f"[lip-sync] Task ID: {task_id}. Polling for result...")
             video_url = self.kling.poll_lip_sync(task_id)
-            print(f"[lip-sync] Done! Downloading video from {video_url[:80]}...")
+            print(f"[lip-sync] Done! Downloading video...")
             video_bytes = _requests.get(video_url, timeout=120).content
             raw_path = os.path.join(tmp, "lipsync_raw.mp4")
             with open(raw_path, "wb") as f:
                 f.write(video_bytes)
             tw, th = self.TARGET_W, self.TARGET_H
-            clip = VideoFileClip(raw_path).resize((tw, th))
+            clip = VideoFileClip(raw_path)
+            clip = _resize_clip(clip, tw, th)
             clip = self._caption_clip(clip, script)
             clip.write_videofile(output_path, fps=30, codec="libx264", audio_codec="aac",
                                  temp_audiofile=os.path.join(tmp, "tmp_audio.m4a"),
@@ -462,7 +476,8 @@ class VideoGenerator:
                 f.write(video_bytes)
             audio_path = os.path.join(tmp, "narration.mp3")
             has_audio = self._tts(script, audio_path)
-            clip = VideoFileClip(kling_path).resize((tw, th))
+            clip = VideoFileClip(kling_path)
+            clip = _resize_clip(clip, tw, th)
             if has_audio:
                 audio = AudioFileClip(audio_path)
                 if audio.duration > clip.duration:
