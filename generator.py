@@ -71,14 +71,20 @@ _SYSTEM_PROMPT = """\
 You are a short-form video content writer for AI influencer accounts.
 You write punchy, scroll-stopping scripts and Kling AI motion prompts.
 
-Rules:
-- script: spoken words ONLY. No stage directions, no emojis, no hashtags.
-  Hook in the first 3 words. 30-60 words total. Conversational and direct.
-- prompt: body movement + camera movement ONLY.
-  Examples: "slow confident head turn to camera, arms crossed",
+Script rules:
+- Spoken words ONLY. No stage directions, no emojis, no hashtags.
+- STRICT structure: Hook (3-5 words) + Body + CTA.
+- STRICT length: 20-25 words MAXIMUM. Every word must earn its place.
+  At 2.5 words/second, 25 words = exactly 10 seconds. Do NOT exceed this.
+- Conversational and direct. Write how people actually talk.
+- Example (22 words): "Nobody tells you this. The algorithm punishes you until you do one thing. Start today or stay invisible."
+
+Prompt rules:
+- Body movement + camera movement ONLY.
+- Examples: "slow confident head turn to camera, arms crossed",
   "pointing finger forward, walking toward camera with attitude",
   "dramatic pause mid-sentence, slow push-in zoom".
-  NEVER describe scene, background, clothing, lighting, or setting.
+- NEVER describe scene, background, clothing, lighting, or setting.
 """
 
 
@@ -98,10 +104,6 @@ def _extract_json(text: str) -> list:
 
 
 def generate_scripts_and_prompts(description: str, count: int, api_key: str) -> list:
-    """
-    Call Claude to generate `count` {script, prompt} pairs for the given content style.
-    Returns a list of dicts: [{"script": str, "prompt": str}, ...]
-    """
     import anthropic
 
     client = anthropic.Anthropic(api_key=api_key)
@@ -227,7 +229,6 @@ class PiAPIKlingClient:
         )
         resp.raise_for_status()
         data = resp.json()
-        # PiAPI returns code 200 on success (vs 0 for direct Kling)
         if data.get("code") != 200:
             raise RuntimeError(f"PiAPI Kling submit error: {data.get('message')}")
         return data["data"]["task_id"]
@@ -267,7 +268,7 @@ class VideoGenerator:
         self.image_paths = image_paths
         self.image_mode = image_mode
         self._index = 0
-        self.kling = kling_client  # KlingClient or PiAPIKlingClient or None
+        self.kling = kling_client
         self.clip_duration = clip_duration
         self.kling_mode = kling_mode
 
@@ -302,7 +303,7 @@ class VideoGenerator:
     def _caption_clip(self, clip, script: str):
         tw, th = self.TARGET_W, self.TARGET_H
         words = script.split()
-        chunks = [" ".join(words[i:i+10]) for i in range(0, len(words), 10)]
+        chunks = [" ".join(words[i:i+6]) for i in range(0, len(words), 6)]
         chunk_dur = clip.duration / max(len(chunks), 1)
         def add_captions(get_frame, t):
             frame = get_frame(t)
@@ -344,11 +345,11 @@ class VideoGenerator:
             has_audio = self._tts(script, audio_path)
             if has_audio:
                 audio = AudioFileClip(audio_path)
-                duration = audio.duration + 0.4
+                duration = min(audio.duration + 0.4, 10.0)
             else:
-                audio, duration = None, max(5.0, len(script.split()) / 2.5)
+                audio, duration = None, min(len(script.split()) / 2.5, 10.0)
             words = script.split()
-            chunks = [" ".join(words[i:i+10]) for i in range(0, len(words), 10)]
+            chunks = [" ".join(words[i:i+6]) for i in range(0, len(words), 6)]
             chunk_dur = duration / max(len(chunks), 1)
             def make_frame(t):
                 scale = max(1.0, 1.08 - 0.08 * (t / duration))
