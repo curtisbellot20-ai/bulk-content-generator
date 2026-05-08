@@ -22,6 +22,9 @@ _FONT_CANDIDATES = [
     "C:/Windows/Fonts/calibrib.ttf",
 ]
 
+LIP_SYNC_MODEL = "kling-v1-6"   # best model for lip-sync via API
+IMG2VIDEO_MODEL = "kling-v1-6"  # best model for image-to-video via API
+
 
 def _load_font(size: int = 52) -> ImageFont.FreeTypeFont:
     for path in _FONT_CANDIDATES:
@@ -130,7 +133,7 @@ def generate_scripts_and_prompts(description: str, count: int, api_key: str) -> 
 
 
 # ---------------------------------------------------------------------------
-# Kling AI direct client (JWT auth) — img2video + lip-sync
+# Kling AI direct client (JWT auth)
 # ---------------------------------------------------------------------------
 
 class KlingClient:
@@ -158,7 +161,7 @@ class KlingClient:
             f"{self.BASE_URL}/v1/videos/lip-sync",
             headers=self._headers(),
             json={
-                "model_name": "kling-v1",
+                "model_name": LIP_SYNC_MODEL,
                 "input": {
                     "image": img_b64,
                     "audio_type": "file",
@@ -202,7 +205,7 @@ class KlingClient:
             f"{self.BASE_URL}/v1/videos/image2video",
             headers=self._headers(),
             json={
-                "model_name": "kling-v1",
+                "model_name": IMG2VIDEO_MODEL,
                 "image": img_b64,
                 "prompt": prompt,
                 "negative_prompt": "blurry, low quality, distorted, watermark",
@@ -241,7 +244,7 @@ class KlingClient:
 
 
 # ---------------------------------------------------------------------------
-# PiAPI Kling client (X-API-KEY auth) — img2video + lip-sync
+# PiAPI Kling client (X-API-KEY auth)
 # ---------------------------------------------------------------------------
 
 class PiAPIKlingClient:
@@ -263,7 +266,7 @@ class PiAPIKlingClient:
             f"{self.BASE_URL}/api/kling/v1/videos/lip-sync",
             headers=self._headers(),
             json={
-                "model_name": "kling-v1",
+                "model_name": LIP_SYNC_MODEL,
                 "input": {
                     "image": img_b64,
                     "audio_type": "file",
@@ -307,7 +310,7 @@ class PiAPIKlingClient:
             f"{self.BASE_URL}/api/kling/v1/videos/image2video",
             headers=self._headers(),
             json={
-                "model_name": "kling-v1",
+                "model_name": IMG2VIDEO_MODEL,
                 "image": img_b64,
                 "prompt": prompt,
                 "negative_prompt": "blurry, low quality, distorted, watermark",
@@ -404,8 +407,7 @@ class VideoGenerator:
         return clip.fl(add_captions)
 
     def _create_lip_sync_video(self, script: str, img_path: str, output_path: str):
-        """Generate TTS audio then use Kling lip-sync to produce a talking head video."""
-        from moviepy.editor import AudioFileClip, VideoFileClip
+        from moviepy.editor import VideoFileClip
         with tempfile.TemporaryDirectory() as tmp:
             audio_path = os.path.join(tmp, "speech.mp3")
             if not self._tts(script, audio_path):
@@ -480,7 +482,6 @@ class VideoGenerator:
     def create_video(self, script: str, prompt: str, output_path: str, video_index: int = 0):
         img_path = self._next_image()
         if self.kling:
-            # Try lip-sync first (talking head), fall back to img2video, then static
             if self.use_lip_sync:
                 try:
                     self._create_lip_sync_video(script, img_path, output_path)
