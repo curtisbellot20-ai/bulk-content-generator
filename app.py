@@ -118,6 +118,12 @@ async def generate_videos(
     secret_key = kling_secret_key.strip() or os.getenv("KLING_SECRET_KEY", "")
     using_kling = bool(piapi_key_val or (access_key and secret_key))
 
+    # Diagnostic: show what keys are loaded
+    print(f"[CONFIG] PIAPI key: {'SET' if piapi_key_val else 'NOT SET'}")
+    print(f"[CONFIG] Kling access key: {'SET (' + access_key[:6] + '...)' if access_key else 'NOT SET'}")
+    print(f"[CONFIG] Kling secret key: {'SET' if secret_key else 'NOT SET'}")
+    print(f"[CONFIG] Using Kling: {using_kling}")
+
     job_id = str(uuid.uuid4())
     jobs[job_id] = {
         "status": "queued", "progress": 0, "total": video_count,
@@ -147,20 +153,26 @@ def _run_generation(job_id, image_paths, scripts_text, prompts_text, video_count
     try:
         if piapi_key:
             kling = PiAPIKlingClient(piapi_key)
+            print("[KLING] Using PiAPI client")
         elif access_key and secret_key:
             kling = KlingClient(access_key, secret_key)
+            print("[KLING] Using direct Kling client (JWT)")
         else:
             kling = None
+            print("[KLING] No API keys found — using static video fallback")
 
         scripts = parse_scripts(scripts_text, video_count, script_mode)
         prompt_list = parse_prompts(prompts_text, scripts)
         gen = VideoGenerator(image_paths, image_mode=image_mode, kling_client=kling,
-                             clip_duration=clip_duration, kling_mode=kling_mode)
+                             clip_duration=clip_duration, kling_mode=kling_mode,
+                             use_lip_sync=True)
         done = []
         for i, (script, prompt) in enumerate(zip(scripts[:video_count], prompt_list)):
             jobs[job_id]["progress"] = i
             out = str(output_dir / f"video_{i+1:02d}.mp4")
+            print(f"[VIDEO {i+1}] Starting — script: {script[:60]}...")
             gen.create_video(script, prompt, out, video_index=i)
+            print(f"[VIDEO {i+1}] Done -> {out}")
             done.append(f"video_{i+1:02d}.mp4")
             jobs[job_id]["videos"] = done.copy()
         jobs[job_id]["status"] = "complete"

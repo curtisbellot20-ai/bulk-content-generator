@@ -157,28 +157,36 @@ class KlingClient:
             img_b64 = base64.b64encode(f.read()).decode()
         with open(audio_path, "rb") as f:
             audio_b64 = base64.b64encode(f.read()).decode()
+        payload = {
+            "model_name": LIP_SYNC_MODEL,
+            "input": {
+                "input_type": "image",
+                "image": img_b64,
+                "audio_type": "file",
+                "audio_file": audio_b64,
+            },
+            "mode": mode,
+        }
+        print(f"[lip-sync] Submitting to Kling direct API, model={LIP_SYNC_MODEL}, mode={mode}")
         resp = _requests.post(
             f"{self.BASE_URL}/v1/videos/lip-sync",
             headers=self._headers(),
-            json={
-                "model_name": LIP_SYNC_MODEL,
-                "input": {
-                    "image": img_b64,
-                    "audio_type": "file",
-                    "audio_file": audio_b64,
-                },
-                "mode": mode,
-                "aspect_ratio": "9:16",
-            },
+            json=payload,
             timeout=30,
         )
+        print(f"[lip-sync] Response status: {resp.status_code}")
+        try:
+            print(f"[lip-sync] Response body: {resp.text[:500]}")
+        except Exception:
+            pass
         resp.raise_for_status()
         data = resp.json()
         if data.get("code") != 0:
-            raise RuntimeError(f"Kling lip-sync submit error: {data.get('message')}")
+            raise RuntimeError(f"Kling lip-sync submit error: {data.get('message')} | full: {data}")
         return data["data"]["task_id"]
 
     def poll_lip_sync(self, task_id: str, timeout: int = 420) -> str:
+        print(f"[lip-sync] Polling task {task_id}...")
         deadline = time.time() + timeout
         while time.time() < deadline:
             resp = _requests.get(
@@ -191,10 +199,12 @@ class KlingClient:
             if data.get("code") != 0:
                 raise RuntimeError(f"Kling lip-sync poll error: {data.get('message')}")
             status = data["data"]["task_status"]
+            print(f"[lip-sync] Task status: {status}")
             if status == "succeed":
                 return data["data"]["task_result"]["videos"][0]["url"]
             if status in ("failed", "expired"):
-                raise RuntimeError(f"Kling lip-sync task {status}: {data['data'].get('task_status_msg', '')}")
+                msg = data['data'].get('task_status_msg', '')
+                raise RuntimeError(f"Kling lip-sync task {status}: {msg}")
             time.sleep(8)
         raise TimeoutError(f"Kling lip-sync task {task_id} timed out")
 
@@ -262,28 +272,36 @@ class PiAPIKlingClient:
             img_b64 = base64.b64encode(f.read()).decode()
         with open(audio_path, "rb") as f:
             audio_b64 = base64.b64encode(f.read()).decode()
+        payload = {
+            "model_name": LIP_SYNC_MODEL,
+            "input": {
+                "input_type": "image",
+                "image": img_b64,
+                "audio_type": "file",
+                "audio_file": audio_b64,
+            },
+            "mode": mode,
+        }
+        print(f"[lip-sync] Submitting to PiAPI, model={LIP_SYNC_MODEL}, mode={mode}")
         resp = _requests.post(
             f"{self.BASE_URL}/api/kling/v1/videos/lip-sync",
             headers=self._headers(),
-            json={
-                "model_name": LIP_SYNC_MODEL,
-                "input": {
-                    "image": img_b64,
-                    "audio_type": "file",
-                    "audio_file": audio_b64,
-                },
-                "mode": mode,
-                "aspect_ratio": "9:16",
-            },
+            json=payload,
             timeout=30,
         )
+        print(f"[lip-sync] Response status: {resp.status_code}")
+        try:
+            print(f"[lip-sync] Response body: {resp.text[:500]}")
+        except Exception:
+            pass
         resp.raise_for_status()
         data = resp.json()
         if data.get("code") != 200:
-            raise RuntimeError(f"PiAPI lip-sync submit error: {data.get('message')}")
+            raise RuntimeError(f"PiAPI lip-sync submit error: {data.get('message')} | full: {data}")
         return data["data"]["task_id"]
 
     def poll_lip_sync(self, task_id: str, timeout: int = 420) -> str:
+        print(f"[lip-sync] Polling PiAPI task {task_id}...")
         deadline = time.time() + timeout
         while time.time() < deadline:
             resp = _requests.get(
@@ -296,6 +314,7 @@ class PiAPIKlingClient:
             if data.get("code") != 200:
                 raise RuntimeError(f"PiAPI lip-sync poll error: {data.get('message')}")
             status = data["data"]["task_status"]
+            print(f"[lip-sync] Task status: {status}")
             if status == "succeed":
                 return data["data"]["task_result"]["videos"][0]["url"]
             if status in ("failed", "expired"):
@@ -392,7 +411,8 @@ class VideoGenerator:
             from gtts import gTTS
             gTTS(text=text, lang="en", slow=False).save(path)
             return True
-        except Exception:
+        except Exception as e:
+            print(f"[TTS] Failed: {e}")
             return False
 
     def _caption_clip(self, clip, script: str):
@@ -408,12 +428,16 @@ class VideoGenerator:
 
     def _create_lip_sync_video(self, script: str, img_path: str, output_path: str):
         from moviepy.editor import VideoFileClip
+        print(f"[lip-sync] Generating TTS audio for: {script[:60]}...")
         with tempfile.TemporaryDirectory() as tmp:
             audio_path = os.path.join(tmp, "speech.mp3")
             if not self._tts(script, audio_path):
                 raise RuntimeError("TTS failed — cannot generate lip-sync without audio")
+            print(f"[lip-sync] TTS done. Submitting lip-sync job...")
             task_id = self.kling.submit_lip_sync(img_path, audio_path, mode=self.kling_mode)
+            print(f"[lip-sync] Task ID: {task_id}. Polling for result...")
             video_url = self.kling.poll_lip_sync(task_id)
+            print(f"[lip-sync] Done! Downloading video from {video_url[:80]}...")
             video_bytes = _requests.get(video_url, timeout=120).content
             raw_path = os.path.join(tmp, "lipsync_raw.mp4")
             with open(raw_path, "wb") as f:
@@ -424,6 +448,7 @@ class VideoGenerator:
             clip.write_videofile(output_path, fps=30, codec="libx264", audio_codec="aac",
                                  temp_audiofile=os.path.join(tmp, "tmp_audio.m4a"),
                                  remove_temp=True, logger=None, threads=4, preset="medium")
+            print(f"[lip-sync] Video saved: {output_path}")
 
     def _create_kling_video(self, script: str, prompt: str, img_path: str, output_path: str):
         from moviepy.editor import AudioFileClip, VideoFileClip
@@ -482,17 +507,22 @@ class VideoGenerator:
     def create_video(self, script: str, prompt: str, output_path: str, video_index: int = 0):
         img_path = self._next_image()
         if self.kling:
+            print(f"[VIDEO] Kling client available, use_lip_sync={self.use_lip_sync}")
             if self.use_lip_sync:
                 try:
                     self._create_lip_sync_video(script, img_path, output_path)
                     return
                 except Exception as exc:
-                    print(f"[Kling lip-sync] video {video_index+1} failed ({exc}) — trying img2video")
+                    print(f"[Kling lip-sync] video {video_index+1} FAILED: {exc}")
+                    print(f"[Kling lip-sync] Falling back to img2video...")
             try:
                 self._create_kling_video(script, prompt, img_path, output_path)
                 return
             except Exception as exc:
-                print(f"[Kling img2video] video {video_index+1} failed ({exc}) — using static fallback")
+                print(f"[Kling img2video] video {video_index+1} FAILED: {exc}")
+                print(f"[Kling img2video] Falling back to static video...")
+        else:
+            print(f"[VIDEO] No Kling client — using static fallback")
         self._create_static_video(script, img_path, output_path)
 
 
