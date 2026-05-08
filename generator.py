@@ -12,7 +12,6 @@ import numpy as np
 import requests as _requests
 from PIL import Image, ImageDraw, ImageFont
 
-# moviepy 1.0.3 uses PIL.Image.ANTIALIAS which was removed in Pillow 10+
 if not hasattr(Image, 'ANTIALIAS'):
     Image.ANTIALIAS = Image.LANCZOS
 
@@ -28,7 +27,7 @@ _FONT_CANDIDATES = [
 
 LIP_SYNC_MODEL = "kling-v1-6"
 IMG2VIDEO_MODEL = "kling-v1-6"
-MAX_DURATION = 10.0  # hard cap: all videos <= 10 seconds
+MAX_DURATION = 10.0
 
 
 def _load_font(size: int = 52) -> ImageFont.FreeTypeFont:
@@ -163,12 +162,12 @@ class KlingClient:
     def _headers(self) -> dict:
         return {"Authorization": f"Bearer {self._jwt()}", "Content-Type": "application/json"}
 
-    def submit_lip_sync(self, image_path: str, audio_path: str, mode: str = "std") -> str:
+    def submit_lip_sync(self, image_path: str, audio_path: str) -> str:
         with open(image_path, "rb") as f:
             img_b64 = base64.b64encode(f.read()).decode()
         with open(audio_path, "rb") as f:
             audio_b64 = base64.b64encode(f.read()).decode()
-        # mode must be inside input, not top-level
+        # lip-sync API does not accept a mode field
         payload = {
             "model_name": LIP_SYNC_MODEL,
             "input": {
@@ -176,10 +175,9 @@ class KlingClient:
                 "image": img_b64,
                 "audio_type": "file",
                 "audio_file": audio_b64,
-                "mode": mode,
             },
         }
-        print(f"[lip-sync] Submitting to Kling direct API, model={LIP_SYNC_MODEL}, mode={mode}")
+        print(f"[lip-sync] Submitting to Kling direct API, model={LIP_SYNC_MODEL}")
         resp = _requests.post(
             f"{self.BASE_URL}/v1/videos/lip-sync",
             headers=self._headers(),
@@ -270,7 +268,7 @@ class PiAPIKlingClient:
     def _headers(self) -> dict:
         return {"X-API-KEY": self.api_key, "Content-Type": "application/json"}
 
-    def submit_lip_sync(self, image_path: str, audio_path: str, mode: str = "std") -> str:
+    def submit_lip_sync(self, image_path: str, audio_path: str) -> str:
         with open(image_path, "rb") as f:
             img_b64 = base64.b64encode(f.read()).decode()
         with open(audio_path, "rb") as f:
@@ -282,10 +280,9 @@ class PiAPIKlingClient:
                 "image": img_b64,
                 "audio_type": "file",
                 "audio_file": audio_b64,
-                "mode": mode,
             },
         }
-        print(f"[lip-sync] Submitting to PiAPI, model={LIP_SYNC_MODEL}, mode={mode}")
+        print(f"[lip-sync] Submitting to PiAPI, model={LIP_SYNC_MODEL}")
         resp = _requests.post(
             f"{self.BASE_URL}/api/kling/v1/videos/lip-sync",
             headers=self._headers(),
@@ -430,7 +427,7 @@ class VideoGenerator:
             if not self._tts(script, audio_path):
                 raise RuntimeError("TTS failed")
             print(f"[lip-sync] Submitting lip-sync job...")
-            task_id = self.kling.submit_lip_sync(img_path, audio_path, mode=self.kling_mode)
+            task_id = self.kling.submit_lip_sync(img_path, audio_path)
             print(f"[lip-sync] Task {task_id} — polling...")
             video_url = self.kling.poll_lip_sync(task_id)
             print(f"[lip-sync] Downloading result...")
@@ -441,7 +438,7 @@ class VideoGenerator:
             tw, th = self.TARGET_W, self.TARGET_H
             clip = VideoFileClip(raw_path)
             clip = _resize_clip(clip, tw, th)
-            clip = _cap_duration(clip)  # hard 10s cap
+            clip = _cap_duration(clip)
             clip = self._caption_clip(clip, script)
             clip.write_videofile(output_path, fps=30, codec="libx264", audio_codec="aac",
                                  temp_audiofile=os.path.join(tmp, "tmp_audio.m4a"),
@@ -462,7 +459,7 @@ class VideoGenerator:
             has_audio = self._tts(script, audio_path)
             clip = VideoFileClip(kling_path)
             clip = _resize_clip(clip, tw, th)
-            clip = _cap_duration(clip)  # hard 10s cap
+            clip = _cap_duration(clip)
             if has_audio:
                 audio = AudioFileClip(audio_path)
                 audio = audio.subclip(0, min(audio.duration, clip.duration))
