@@ -8,7 +8,8 @@ from fastapi import BackgroundTasks, FastAPI, File, Form, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-load_dotenv()
+# override=True ensures .env file always wins over stale shell exports
+load_dotenv(override=True)
 
 app = FastAPI(title="Bulk Content Generator")
 
@@ -30,7 +31,6 @@ async def index():
 
 @app.get("/api/config-status")
 async def config_status():
-    """Tell the UI which API keys are already loaded from .env."""
     piapi = bool(os.getenv("PIAPI_KEY", "").strip())
     access = bool(os.getenv("KLING_ACCESS_KEY", "").strip())
     secret = bool(os.getenv("KLING_SECRET_KEY", "").strip())
@@ -79,12 +79,11 @@ async def delete_image(session_id: str, filename: str):
 async def generate_scripts(
     description: str = Form(...),
     count: int = Form(default=5),
-    anthropic_key: str = Form(default=""),
 ):
-    api_key = anthropic_key.strip() or os.getenv("ANTHROPIC_API_KEY", "")
+    api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
     if not api_key:
         return JSONResponse(
-            {"error": "Anthropic API key required. Add to .env or enter in the UI."},
+            {"error": "ANTHROPIC_API_KEY not found. Check your .env file."},
             status_code=400,
         )
     count = max(1, min(20, count))
@@ -107,9 +106,6 @@ async def generate_videos(
     script_mode: str = Form(default="separate"),
     clip_duration: str = Form(default="5"),
     kling_mode: str = Form(default="std"),
-    piapi_key: str = Form(default=""),
-    kling_access_key: str = Form(default=""),
-    kling_secret_key: str = Form(default=""),
 ):
     video_count = max(1, min(20, video_count))
     session_dir = UPLOAD_DIR / session_id
@@ -121,12 +117,12 @@ async def generate_videos(
     if not scripts.strip():
         return JSONResponse({"error": "No scripts provided"}, status_code=400)
 
-    piapi_key_val = piapi_key.strip() or os.getenv("PIAPI_KEY", "")
-    access_key = kling_access_key.strip() or os.getenv("KLING_ACCESS_KEY", "")
-    secret_key = kling_secret_key.strip() or os.getenv("KLING_SECRET_KEY", "")
-    using_kling = bool(piapi_key_val or (access_key and secret_key))
+    piapi_key = os.getenv("PIAPI_KEY", "").strip()
+    access_key = os.getenv("KLING_ACCESS_KEY", "").strip()
+    secret_key = os.getenv("KLING_SECRET_KEY", "").strip()
+    using_kling = bool(piapi_key or (access_key and secret_key))
 
-    print(f"[CONFIG] PIAPI key: {'SET' if piapi_key_val else 'NOT SET'}")
+    print(f"[CONFIG] PIAPI key: {'SET' if piapi_key else 'NOT SET'}")
     print(f"[CONFIG] Kling access key: {'SET (' + access_key[:6] + '...)' if access_key else 'NOT SET'}")
     print(f"[CONFIG] Kling secret key: {'SET' if secret_key else 'NOT SET'}")
     print(f"[CONFIG] Using Kling: {using_kling}")
@@ -142,7 +138,7 @@ async def generate_videos(
         scripts_text=scripts, prompts_text=prompts,
         video_count=video_count, image_mode=image_mode,
         script_mode=script_mode, clip_duration=clip_duration,
-        kling_mode=kling_mode, piapi_key=piapi_key_val,
+        kling_mode=kling_mode, piapi_key=piapi_key,
         access_key=access_key, secret_key=secret_key,
     )
     return {"job_id": job_id}
