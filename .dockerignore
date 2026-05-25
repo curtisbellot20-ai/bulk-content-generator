@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+uploads/
+outputs/
+__pycache__/
+*.pyc
+*.pyo
+.git/
+*.zip
