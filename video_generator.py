@@ -1,5 +1,4 @@
 import os
-import base64
 import requests
 
 PIAPI_BASE = "https://api.piapi.ai/api/kling/v1"
@@ -9,16 +8,31 @@ def _headers():
     api_key = os.getenv("KLING_API_KEY")
     if not api_key:
         raise ValueError("KLING_API_KEY not set in .env")
-    return {"x-api-key": api_key, "Content-Type": "application/json"}
+    return {"X-API-Key": api_key, "Content-Type": "application/json"}
+
+
+def _upload_image_get_url(image_path: str) -> str:
+    """PiAPI requires a public image URL, so host the local file first."""
+    with open(image_path, "rb") as f:
+        resp = requests.post(
+            "https://catbox.moe/user/api.php",
+            data={"reqtype": "fileupload"},
+            files={"fileToUpload": f},
+            timeout=30,
+        )
+    resp.raise_for_status()
+    url = resp.text.strip()
+    if not url.startswith("http"):
+        raise Exception(f"Image upload failed: {url}")
+    return url
 
 
 def start_video(image_path: str, script: str, duration: int = 5) -> str:
-    with open(image_path, "rb") as f:
-        image_b64 = base64.b64encode(f.read()).decode()
+    image_url = _upload_image_get_url(image_path)
 
     payload = {
         "model_name": "kling-v1-5",
-        "image": image_b64,
+        "image": image_url,
         "prompt": script,
         "duration": str(duration),
         "mode": "std",
@@ -28,9 +42,6 @@ def start_video(image_path: str, script: str, duration: int = 5) -> str:
                          json=payload, headers=_headers(), timeout=30)
     resp.raise_for_status()
     result = resp.json()
-    if result.get("code") not in (0, 200, None):
-        raise Exception(result.get("message", "PiAPI error"))
-    # PiAPI wraps in data or returns task_id directly
     data = result.get("data", result)
     task_id = data.get("task_id") or data.get("id")
     if not task_id:
@@ -45,7 +56,6 @@ def check_video(task_id: str) -> dict:
     result = resp.json()
     data = result.get("data", result)
     status = data.get("task_status") or data.get("status", "")
-
     if status in ("succeed", "completed", "done", "success"):
         videos = (data.get("task_result") or {}).get("videos") or data.get("videos", [])
         url = videos[0].get("url") if videos else data.get("video_url") or data.get("url")
